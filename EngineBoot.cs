@@ -199,6 +199,88 @@ namespace EaxReverbEngine
 			}
 		}
 
+		private static FieldInfo FindField(Type t, string name)
+		{
+			while (t != null)
+			{
+				FieldInfo f = t.GetField(name, EngineBoot.BF | BindingFlags.DeclaredOnly);
+				if (f != null)
+				{
+					return f;
+				}
+				t = t.BaseType;
+			}
+			return null;
+		}
+
+		// يربط زر Equalizer في نافذة EAX بنافذة الـ EQ (بدل رسالة "not part of...")
+		private static bool HookEqualizerButton(object form, Engine eng)
+		{
+			FieldInfo fw = form.GetType().GetField("_widgets", EngineBoot.BF);
+			if (fw == null)
+			{
+				return false;
+			}
+			System.Collections.IEnumerable list = fw.GetValue(form) as System.Collections.IEnumerable;
+			if (list == null)
+			{
+				return false;
+			}
+			bool hooked = false;
+			foreach (object w in list)
+			{
+				if (w == null)
+				{
+					continue;
+				}
+				try
+				{
+					string tn = w.GetType().Name;
+					if (tn == "IconButton" || tn == "SpriteButton")
+					{
+						object tip = EngineBoot.Member(w, "Tip", "Tip");
+						if (tip != null && string.Equals(tip.ToString(), "Equalizer", StringComparison.OrdinalIgnoreCase))
+						{
+							FieldInfo fc = EngineBoot.FindField(w.GetType(), "Click");
+							if (fc != null)
+							{
+								fc.SetValue(w, new EventHandler(delegate(object s2, EventArgs a2)
+								{
+									EqPanel.ShowFor(eng);
+								}));
+								hooked = true;
+							}
+						}
+					}
+					else if (tn == "ActionZoneWidget")
+					{
+						object bo = EngineBoot.Member(w, "Bounds", "Bounds");
+						if (bo is System.Drawing.Rectangle)
+						{
+							System.Drawing.Rectangle r = (System.Drawing.Rectangle)bo;
+							if (r.X == 119 && r.Y == 304 && r.Width == 25 && r.Height == 25)
+							{
+								FieldInfo fa = EngineBoot.FindField(w.GetType(), "_action");
+								if (fa != null)
+								{
+									fa.SetValue(w, new Action(delegate()
+									{
+										EqPanel.ShowFor(eng);
+									}));
+									hooked = true;
+								}
+							}
+						}
+					}
+				}
+				catch (Exception ex)
+				{
+					Log.Write("eq hook: " + ex.Message);
+				}
+			}
+			return hooked;
+		}
+
 		private static void ShowPanel(object form)
 		{
 			try
@@ -208,17 +290,30 @@ namespace EaxReverbEngine
 				{
 					return;
 				}
+				Action act = delegate()
+				{
+					bool hooked = false;
+					try
+					{
+						hooked = EqHook.TryHook(form, eng);
+					}
+					catch (Exception ex2)
+					{
+						Log.Write("hook: " + ex2.Message);
+					}
+					if (!hooked)
+					{
+						EqPanel.ShowFor(eng);
+					}
+				};
 				Control c = form as Control;
 				if (c != null && c.InvokeRequired)
 				{
-					c.BeginInvoke(new Action(delegate()
-					{
-						EqPanel.ShowFor(eng);
-					}));
+					c.BeginInvoke(act);
 				}
 				else
 				{
-					EqPanel.ShowFor(eng);
+					act();
 				}
 			}
 			catch (Exception ex)

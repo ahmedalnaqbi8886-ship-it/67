@@ -4,8 +4,9 @@ using System.IO;
 
 namespace EaxReverbEngine
 {
-    // EQ 7 نطاقات + Bass Boost + Treble + Crystalliser + Surround + Level
-    // يشتغل على الصوت بعد الـ Reverb (قبل تغيير الـ sample rate).
+    // سلسلة التأثيرات (بعد الـ Reverb):
+    // Bass Boost -> Treble -> Subwoofer -> EQ 7 نطاقات -> Bass Management -> Crystalliser -> Surround
+    // -> اشارة الاختبار -> Volume/Balance/Level
     public sealed class FxChain
     {
         public const int Bands = 7;
@@ -23,13 +24,24 @@ namespace EaxReverbEngine
         private readonly Bq[] _eq = new Bq[Bands];
         private readonly Bq _bq = new Bq();
         private readonly Bq _tq = new Bq();
+        private readonly Bq _sq = new Bq();
+        private readonly Bq _lpq = new Bq();
         private readonly float[] _lp = new float[2];
         private float _bass, _treble, _crystal, _surround, _levelDb;
-        private bool _eqOn = true;
+        private float _master = 100f, _balance, _volL = 100f, _volR = 100f, _sub = 50f;
+        private float _bassCut = 100f, _bmPct = 100f, _bmCross = 80f;
+        private bool _eqOn = true, _bassOn = true, _bmOn;
+        private int _spkMode;
         private float _fs = 48000f;
         private float _lpA;
-        private float _gain = 1f;
+        private float _gL = 1f, _gR = 1f;
         private bool _dirty = true;
+        private float[] _tl = new float[0];
+        private float[] _tr = new float[0];
+        private float _peakL, _peakR;
+        private int _testMode, _testRemain;
+        private long _testPos;
+        private readonly Random _rnd = new Random();
 
         public FxChain()
         {
@@ -42,6 +54,7 @@ namespace EaxReverbEngine
             return v < lo ? lo : (v > hi ? hi : v);
         }
 
+        // ---------- خصائص ----------
         public float GetBand(int i) { lock (_lock) { return _band[i]; } }
         public void SetBand(int i, float db)
         {
@@ -53,19 +66,59 @@ namespace EaxReverbEngine
         public float Crystal { get { lock (_lock) { return _crystal; } } set { lock (_lock) { _crystal = Clamp(value, 0f, 100f); _dirty = true; } } }
         public float Surround { get { lock (_lock) { return _surround; } } set { lock (_lock) { _surround = Clamp(value, 0f, 100f); _dirty = true; } } }
         public float LevelDb { get { lock (_lock) { return _levelDb; } } set { lock (_lock) { _levelDb = Clamp(value, -24f, 0f); _dirty = true; } } }
+        public float Master { get { lock (_lock) { return _master; } } set { lock (_lock) { _master = Clamp(value, 0f, 100f); _dirty = true; } } }
+        public float Balance { get { lock (_lock) { return _balance; } } set { lock (_lock) { _balance = Clamp(value, -100f, 100f); _dirty = true; } } }
+        public float VolL { get { lock (_lock) { return _volL; } } set { lock (_lock) { _volL = Clamp(value, 0f, 100f); _dirty = true; } } }
+        public float VolR { get { lock (_lock) { return _volR; } } set { lock (_lock) { _volR = Clamp(value, 0f, 100f); _dirty = true; } } }
+        public float Sub { get { lock (_lock) { return _sub; } } set { lock (_lock) { _sub = Clamp(value, 0f, 100f); _dirty = true; } } }
+        public float BassCutoff { get { lock (_lock) { return _bassCut; } } set { lock (_lock) { _bassCut = Clamp(value, 10f, 200f); _dirty = true; } } }
+        public float BmPercent { get { lock (_lock) { return _bmPct; } } set { lock (_lock) { _bmPct = Clamp(value, 0f, 100f); _dirty = true; } } }
+        public float BmCrossover { get { lock (_lock) { return _bmCross; } } set { lock (_lock) { _bmCross = Clamp(value, 10f, 200f); _dirty = true; } } }
         public bool EqOn { get { lock (_lock) { return _eqOn; } } set { lock (_lock) { _eqOn = value; } } }
+        public bool BassOn { get { lock (_lock) { return _bassOn; } } set { lock (_lock) { _bassOn = value; } } }
+        public bool BmOn { get { lock (_lock) { return _bmOn; } } set { lock (_lock) { _bmOn = value; } } }
+        public int SpeakerMode { get { lock (_lock) { return _spkMode; } } set { lock (_lock) { _spkMode = value < 0 ? 0 : (value > 2 ? 2 : value); } } }
 
-        public void Reset()
+        public void ResetEq()
         {
             lock (_lock)
             {
                 for (int i = 0; i < Bands; i++) _band[i] = 0f;
-                _bass = _treble = _crystal = _surround = 0f;
-                _levelDb = 0f;
-                _dirty = true;
+                _eqOn = true; _levelDb = 0f; _dirty = true;
             }
         }
+        public void ResetMixer()
+        {
+            lock (_lock)
+            {
+                _master = 100f; _balance = 0f; _volL = 100f; _volR = 100f; _sub = 50f;
+                _treble = 0f; _crystal = 0f; _surround = 0f; _dirty = true;
+            }
+        }
+        public void ResetSpeaker()
+        {
+            lock (_lock)
+            {
+                _bass = 0f; _bassOn = true; _bassCut = 100f;
+                _bmOn = false; _bmPct = 100f; _bmCross = 80f; _spkMode = 0; _dirty = true;
+            }
+        }
+        public void Reset() { ResetEq(); ResetMixer(); ResetSpeaker(); }
 
+        // اشارة اختبار: 1 = Channel (يمين/يسار بالتناوب)، 2 = Noise
+        public int TestMode { get { lock (_lock) { return _testRemain > 0 ? _testMode : 0; } } }
+        public void StartTest(int mode)
+        {
+            lock (_lock) { _testMode = mode; _testPos = 0; _testRemain = (int)(_fs * 6f); }
+        }
+        public void StopTest() { lock (_lock) { _testRemain = 0; } }
+
+        public void ReadPeaks(out float l, out float r)
+        {
+            lock (_lock) { l = _peakL; r = _peakR; _peakL = 0f; _peakR = 0f; }
+        }
+
+        // ---------- فلاتر ----------
         private static void Peak(Bq q, double f0, double dB, double fs)
         {
             double A = Math.Pow(10.0, dB / 40.0);
@@ -110,13 +163,39 @@ namespace EaxReverbEngine
             q.a1 = (float)(a1 / a0); q.a2 = (float)(a2 / a0);
         }
 
+        private static void Lowpass(Bq q, double f0, double fs)
+        {
+            double w = 2.0 * Math.PI * f0 / fs;
+            double cw = Math.Cos(w);
+            double alpha = Math.Sin(w) / (2.0 * 0.70710678);
+            double a0 = 1.0 + alpha;
+            q.b0 = (float)(((1.0 - cw) / 2.0) / a0);
+            q.b1 = (float)((1.0 - cw) / a0);
+            q.b2 = (float)(((1.0 - cw) / 2.0) / a0);
+            q.a1 = (float)((-2.0 * cw) / a0);
+            q.a2 = (float)((1.0 - alpha) / a0);
+        }
+
+        private static float VolGain(float v)
+        {
+            if (v <= 0.5f) return 0f;
+            return (float)Math.Pow(10.0, (-60.0 * (1.0 - v / 100.0)) / 20.0);
+        }
+
         private void Recalc()
         {
             for (int i = 0; i < Bands; i++) Peak(_eq[i], Freq[i], _band[i], _fs);
-            Shelf(_bq, false, 100.0, _bass * 0.14, _fs);
+            Shelf(_bq, false, _bassCut, _bass * 0.14, _fs);
             Shelf(_tq, true, 6500.0, _treble * 0.12, _fs);
+            Shelf(_sq, false, 120.0, (_sub - 50.0) * 0.24, _fs);
+            Lowpass(_lpq, _bmCross, _fs);
             _lpA = (float)Math.Exp(-2.0 * Math.PI * 3000.0 / _fs);
-            _gain = (float)Math.Pow(10.0, _levelDb / 20.0);
+            float lv = (float)Math.Pow(10.0, _levelDb / 20.0);
+            float vm = VolGain(_master);
+            float bl = _balance > 0f ? 1f - _balance / 100f : 1f;
+            float br = _balance < 0f ? 1f + _balance / 100f : 1f;
+            _gL = lv * vm * VolGain(_volL) * bl;
+            _gR = lv * vm * VolGain(_volR) * br;
             _dirty = false;
         }
 
@@ -141,14 +220,28 @@ namespace EaxReverbEngine
                 if (rate > 0 && Math.Abs(rate - _fs) > 0.5f) { _fs = rate; _dirty = true; }
                 if (_dirty) Recalc();
 
-                if (_bass > 0.5f) { Run(_bq, l, 0, n); Run(_bq, r, 1, n); }
+                if (_bassOn && _bass > 0.5f) { Run(_bq, l, 0, n); Run(_bq, r, 1, n); }
                 if (_treble > 0.5f) { Run(_tq, l, 0, n); Run(_tq, r, 1, n); }
+                if (Math.Abs(_sub - 50f) > 0.5f) { Run(_sq, l, 0, n); Run(_sq, r, 1, n); }
                 if (_eqOn)
                 {
                     for (int b = 0; b < Bands; b++)
                     {
                         if (Math.Abs(_band[b]) < 0.01f) continue;
                         Run(_eq[b], l, 0, n); Run(_eq[b], r, 1, n);
+                    }
+                }
+                if (_bmOn)
+                {
+                    if (_tl.Length < n) { _tl = new float[n]; _tr = new float[n]; }
+                    Array.Copy(l, _tl, n); Array.Copy(r, _tr, n);
+                    Run(_lpq, _tl, 0, n); Run(_lpq, _tr, 1, n);
+                    float p = _bmPct * 0.01f;
+                    for (int i = 0; i < n; i++)
+                    {
+                        float lo = 0.5f * (_tl[i] + _tr[i]);
+                        l[i] = (l[i] - _tl[i]) + lo * p;
+                        r[i] = (r[i] - _tr[i]) + lo * p;
                     }
                 }
                 if (_crystal > 0.5f)
@@ -173,29 +266,66 @@ namespace EaxReverbEngine
                         l[i] = m + s; r[i] = m - s;
                     }
                 }
-                if (Math.Abs(_gain - 1f) > 0.0001f)
+                if (_testRemain > 0)
                 {
-                    for (int i = 0; i < n; i++) { l[i] *= _gain; r[i] *= _gain; }
+                    int cnt = n < _testRemain ? n : _testRemain;
+                    for (int i = 0; i < cnt; i++)
+                    {
+                        if (_testMode == 1)
+                        {
+                            double t = _testPos / (double)_fs;
+                            float s = 0.2f * (float)Math.Sin(2.0 * Math.PI * 440.0 * t);
+                            if (((long)t) % 2 == 0) l[i] += s; else r[i] += s;
+                        }
+                        else
+                        {
+                            float nz = ((float)_rnd.NextDouble() * 2f - 1f) * 0.15f;
+                            l[i] += nz; r[i] += nz;
+                        }
+                        _testPos++;
+                    }
+                    _testRemain -= cnt;
                 }
+                float pl = _peakL, pr = _peakR;
+                for (int i = 0; i < n; i++)
+                {
+                    l[i] *= _gL; r[i] *= _gR;
+                    float al = l[i] < 0f ? -l[i] : l[i];
+                    float ar = r[i] < 0f ? -r[i] : r[i];
+                    if (al > pl) pl = al;
+                    if (ar > pr) pr = ar;
+                }
+                _peakL = pl; _peakR = pr;
             }
         }
 
-        // ---------- حفظ / تحميل (fx.ini جنب engine.ini) ----------
+        // ---------- حفظ / تحميل (fx.ini) ----------
         private static string F(float v) { return v.ToString("0.##", CultureInfo.InvariantCulture); }
 
         public void Save(string dir)
         {
             lock (_lock)
             {
-                string[] lines = new string[Bands + 6];
-                for (int i = 0; i < Bands; i++) lines[i] = "Band" + i + "=" + F(_band[i]);
-                lines[Bands] = "EqOn=" + (_eqOn ? "1" : "0");
-                lines[Bands + 1] = "Bass=" + F(_bass);
-                lines[Bands + 2] = "Treble=" + F(_treble);
-                lines[Bands + 3] = "Crystal=" + F(_crystal);
-                lines[Bands + 4] = "Surround=" + F(_surround);
-                lines[Bands + 5] = "Level=" + F(_levelDb);
-                File.WriteAllLines(Path.Combine(dir, "fx.ini"), lines);
+                System.Collections.Generic.List<string> L = new System.Collections.Generic.List<string>();
+                for (int i = 0; i < Bands; i++) L.Add("Band" + i + "=" + F(_band[i]));
+                L.Add("EqOn=" + (_eqOn ? "1" : "0"));
+                L.Add("Bass=" + F(_bass));
+                L.Add("BassOn=" + (_bassOn ? "1" : "0"));
+                L.Add("BassCut=" + F(_bassCut));
+                L.Add("Treble=" + F(_treble));
+                L.Add("Crystal=" + F(_crystal));
+                L.Add("Surround=" + F(_surround));
+                L.Add("Level=" + F(_levelDb));
+                L.Add("Master=" + F(_master));
+                L.Add("Balance=" + F(_balance));
+                L.Add("VolL=" + F(_volL));
+                L.Add("VolR=" + F(_volR));
+                L.Add("Sub=" + F(_sub));
+                L.Add("BmOn=" + (_bmOn ? "1" : "0"));
+                L.Add("BmPct=" + F(_bmPct));
+                L.Add("BmCross=" + F(_bmCross));
+                L.Add("SpkMode=" + _spkMode);
+                File.WriteAllLines(Path.Combine(dir, "fx.ini"), L.ToArray());
             }
         }
 
@@ -217,10 +347,21 @@ namespace EaxReverbEngine
                 }
                 else if (k == "EqOn") EqOn = v != 0f;
                 else if (k == "Bass") Bass = v;
+                else if (k == "BassOn") BassOn = v != 0f;
+                else if (k == "BassCut") BassCutoff = v;
                 else if (k == "Treble") Treble = v;
                 else if (k == "Crystal") Crystal = v;
                 else if (k == "Surround") Surround = v;
                 else if (k == "Level") LevelDb = v;
+                else if (k == "Master") Master = v;
+                else if (k == "Balance") Balance = v;
+                else if (k == "VolL") VolL = v;
+                else if (k == "VolR") VolR = v;
+                else if (k == "Sub") Sub = v;
+                else if (k == "BmOn") BmOn = v != 0f;
+                else if (k == "BmPct") BmPercent = v;
+                else if (k == "BmCross") BmCrossover = v;
+                else if (k == "SpkMode") SpeakerMode = (int)v;
             }
         }
     }
