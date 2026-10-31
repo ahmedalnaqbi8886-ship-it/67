@@ -36,6 +36,9 @@ namespace EaxReverbEngine
         private float _lpA;
         private float _gL = 1f, _gR = 1f;
         private bool _dirty = true;
+        private bool _stereoOn, _mute;
+        private float[] _dly = new float[4096];
+        private int _dlyPos;
         private float[] _tl = new float[0];
         private float[] _tr = new float[0];
         private float _peakL, _peakR;
@@ -77,6 +80,8 @@ namespace EaxReverbEngine
         public bool EqOn { get { lock (_lock) { return _eqOn; } } set { lock (_lock) { _eqOn = value; } } }
         public bool BassOn { get { lock (_lock) { return _bassOn; } } set { lock (_lock) { _bassOn = value; } } }
         public bool BmOn { get { lock (_lock) { return _bmOn; } } set { lock (_lock) { _bmOn = value; } } }
+        public bool StereoOn { get { lock (_lock) { return _stereoOn; } } set { lock (_lock) { _stereoOn = value; } } }
+        public bool Mute { get { lock (_lock) { return _mute; } } set { lock (_lock) { _mute = value; _dirty = true; } } }
         public int SpeakerMode { get { lock (_lock) { return _spkMode; } } set { lock (_lock) { _spkMode = value < 0 ? 0 : (value > 2 ? 2 : value); } } }
 
         public void ResetEq()
@@ -84,14 +89,14 @@ namespace EaxReverbEngine
             lock (_lock)
             {
                 for (int i = 0; i < Bands; i++) _band[i] = 0f;
-                _eqOn = true; _levelDb = 0f; _dirty = true;
+                _eqOn = true; _levelDb = 0f; _stereoOn = false; _dirty = true;
             }
         }
         public void ResetMixer()
         {
             lock (_lock)
             {
-                _master = 100f; _balance = 0f; _volL = 100f; _volR = 100f; _sub = 50f;
+                _mute = false; _master = 100f; _balance = 0f; _volL = 100f; _volR = 100f; _sub = 50f;
                 _treble = 0f; _crystal = 0f; _surround = 0f; _dirty = true;
             }
         }
@@ -191,7 +196,7 @@ namespace EaxReverbEngine
             Lowpass(_lpq, _bmCross, _fs);
             _lpA = (float)Math.Exp(-2.0 * Math.PI * 3000.0 / _fs);
             float lv = (float)Math.Pow(10.0, _levelDb / 20.0);
-            float vm = VolGain(_master);
+            float vm = _mute ? 0f : VolGain(_master);
             float bl = _balance > 0f ? 1f - _balance / 100f : 1f;
             float br = _balance < 0f ? 1f + _balance / 100f : 1f;
             _gL = lv * vm * VolGain(_volL) * bl;
@@ -256,14 +261,23 @@ namespace EaxReverbEngine
                         r[i] = sr + amt * (float)Math.Tanh((sr - _lp[1]) * 4f);
                     }
                 }
-                if (_surround > 0.5f)
+                if (_stereoOn || _surround > 0.5f)
                 {
-                    float k = 1f + _surround * 0.01f * 1.5f;
+                    // عرض ستيريو: نوسّع الجانب + نضيف تأخير قصير من الوسط (يسمع حتى لو الصوت مونو)
+                    float k = _stereoOn ? 2.2f : 1f + _surround * 0.01f * 1.5f;
+                    float dm = _stereoOn ? 0.45f : _surround * 0.01f * 0.6f;
+                    int dl = (int)(_fs * (_stereoOn ? 0.014f : 0.022f));
+                    if (dl < 8) dl = 8;
+                    if (dl >= _dly.Length) dl = _dly.Length - 1;
                     for (int i = 0; i < n; i++)
                     {
                         float m = 0.5f * (l[i] + r[i]);
-                        float s = 0.5f * (l[i] - r[i]) * k;
-                        l[i] = m + s; r[i] = m - s;
+                        int rp = _dlyPos - dl; if (rp < 0) rp += _dly.Length;
+                        float d = _dly[rp];
+                        _dly[_dlyPos] = m;
+                        _dlyPos++; if (_dlyPos >= _dly.Length) _dlyPos = 0;
+                        float sd = 0.5f * (l[i] - r[i]) * k + dm * d;
+                        l[i] = m + sd; r[i] = m - sd;
                     }
                 }
                 if (_testRemain > 0)
@@ -315,6 +329,7 @@ namespace EaxReverbEngine
                 L.Add("Treble=" + F(_treble));
                 L.Add("Crystal=" + F(_crystal));
                 L.Add("Surround=" + F(_surround));
+                L.Add("Stereo=" + (_stereoOn ? "1" : "0"));
                 L.Add("Level=" + F(_levelDb));
                 L.Add("Master=" + F(_master));
                 L.Add("Balance=" + F(_balance));
@@ -352,6 +367,7 @@ namespace EaxReverbEngine
                 else if (k == "Treble") Treble = v;
                 else if (k == "Crystal") Crystal = v;
                 else if (k == "Surround") Surround = v;
+                else if (k == "Stereo") StereoOn = v > 0.5f;
                 else if (k == "Level") LevelDb = v;
                 else if (k == "Master") Master = v;
                 else if (k == "Balance") Balance = v;

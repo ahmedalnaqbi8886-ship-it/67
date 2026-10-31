@@ -9,65 +9,65 @@ namespace EaxReverbEngine
     {
         private static readonly string[] Modes = new string[] { "Headphone", "2 Speakers", "2.1 Speakers" };
         private ComboBox _cmb1, _cmb2;
-        private TestPic _pic;
-        private Label _testState;
-        private TrackBar _bmPct, _bmCross, _bbLevel, _bbCut;
-        private Label _vBmPct, _vBmCross, _vBbLevel, _vBbCut;
+        private RoomPic _pic;
+        private SkinButton _bCh, _bNo;
+        private CSlider _bmPct, _bmCross, _bbLevel, _bbCut;
+        private Label _vBmCross, _vBbLevel, _vBbCut;
         private CheckBox _bmOn, _bbOn;
         private readonly Timer _tm = new Timer();
 
         public SpeakerWindow(FxChain fx) : base(fx, "speaker", "Speaker Settings", 500, 300)
         {
-            TabControl tc = new TabControl();
-            tc.SetBounds(0, 0, 500, 300);
-            Controls.Add(tc);
-            TabPage p1 = new TabPage("Speaker Selection");
-            TabPage p2 = new TabPage("Bass Management");
-            TabPage p3 = new TabPage("Bass Boost");
-            p1.BackColor = Color.FromArgb(240, 240, 243);
-            p2.BackColor = Color.FromArgb(240, 240, 243);
-            p3.BackColor = Color.FromArgb(240, 240, 243);
-            tc.TabPages.Add(p1); tc.TabPages.Add(p2); tc.TabPages.Add(p3);
+            Tabs tabs = new Tabs(new string[] { "Speaker Selection", "Bass Management", "Bass Boost" });
+            tabs.SetBounds(0, 0, 500, 32);
+            Body.Controls.Add(tabs);
+            Panel[] pg = new Panel[3];
+            for (int i = 0; i < 3; i++)
+            {
+                pg[i] = new Panel();
+                pg[i].SetBounds(0, 34, 500, 266);
+                pg[i].BackColor = Skin.Back;
+                pg[i].Visible = i == 0;
+                Body.Controls.Add(pg[i]);
+            }
+            tabs.Changed += delegate { for (int i = 0; i < 3; i++) pg[i].Visible = tabs.Selected == i; };
 
             // ---- Speaker Selection ----
-            Panel a = Group(p1, "Speaker/Headphone Selection", 4, 6, 236, 258);
-            _cmb1 = Combo(a, 12, 30);
-            Panel b = Group(p1, "Speaker Test", 246, 6, 246, 258);
-            _pic = new TestPic();
-            _pic.Location = new Point(24, 30);
+            Panel a = Group(pg[0], "Speaker/Headphone Selection", 6, 4, 236, 256);
+            _cmb1 = Combo(a, 12, 32);
+            Panel b = Group(pg[0], "Speaker Test", 250, 4, 244, 256);
+            _pic = new RoomPic();
+            _pic.Location = new Point(12, 30);
             b.Controls.Add(_pic);
-            Button bCh = new Button(); bCh.Text = "Channel"; bCh.SetBounds(24, 164, 92, 26); b.Controls.Add(bCh);
-            Button bNo = new Button(); bNo.Text = "Noise"; bNo.SetBounds(128, 164, 92, 26); b.Controls.Add(bNo);
-            _testState = Cap(b, "", 24, 200, 200, ContentAlignment.MiddleCenter);
-            bCh.Click += delegate { Toggle(1); };
-            bNo.Click += delegate { Toggle(2); };
+            _bCh = new SkinButton(); _bCh.Text = "Channel"; _bCh.SetBounds(30, 184, 84, 24); b.Controls.Add(_bCh);
+            _bNo = new SkinButton(); _bNo.Text = "Noise"; _bNo.SetBounds(130, 184, 84, 24); b.Controls.Add(_bNo);
+            _bCh.Click += delegate { Toggle(1); };
+            _bNo.Click += delegate { Toggle(2); };
 
             // ---- Bass Management ----
-            Panel c = Group(p2, "", 4, 6, 488, 100);
+            Panel c = Group(pg[1], "", 6, 4, 488, 110);
             _cmb2 = Combo(c, 12, 12);
-            Cap(c, "Bass level", 240, 14, 80, ContentAlignment.MiddleLeft);
-            _vBmPct = Cap(c, "", 320, 14, 150, ContentAlignment.MiddleLeft);
-            Cap(c, "0%", 12, 62, 40, ContentAlignment.MiddleLeft);
-            _bmPct = HBar(c, 50, 54, 390, 0, 100);
-            Cap(c, "100%", 444, 62, 40, ContentAlignment.MiddleLeft);
-            Panel d = Group(p2, "", 4, 112, 488, 152);
-            _bmOn = new CheckBox(); _bmOn.Text = "Bass Redirection"; _bmOn.AutoSize = true; _bmOn.Location = new Point(18, 16); d.Controls.Add(_bmOn);
-            _vBmCross = Cap(d, "", 34, 52, 300, ContentAlignment.MiddleLeft);
-            Cap(d, "10 Hz", 18, 92, 50, ContentAlignment.MiddleLeft);
-            _bmCross = HBar(d, 70, 84, 360, 10, 200);
-            Cap(d, "200 Hz", 436, 92, 50, ContentAlignment.MiddleLeft);
+            Cap(c, "0%", 12, 66, 40, ContentAlignment.MiddleLeft);
+            _bmPct = HBar(c, 50, 58, 390, 0, 100);
+            Cap(c, "100%", 446, 66, 40, ContentAlignment.MiddleLeft);
+            Panel d = Group(pg[1], "", 6, 120, 488, 140);
+            _bmOn = new CheckBox(); _bmOn.Text = "Bass Redirection"; _bmOn.AutoSize = true; _bmOn.BackColor = Color.Transparent; _bmOn.Location = new Point(18, 14); d.Controls.Add(_bmOn);
+            _vBmCross = Cap(d, "", 34, 46, 300, ContentAlignment.MiddleLeft);
+            Cap(d, "10 Hz", 18, 84, 50, ContentAlignment.MiddleLeft);
+            _bmCross = HBar(d, 66, 76, 370, 10, 200);
+            Cap(d, "200 Hz", 442, 84, 46, ContentAlignment.MiddleLeft);
 
             // ---- Bass Boost ----
-            Panel e2 = Group(p3, "", 4, 6, 488, 258);
-            _bbOn = new CheckBox(); _bbOn.Text = "Enable Bass Boost"; _bbOn.AutoSize = true; _bbOn.Location = new Point(18, 18); e2.Controls.Add(_bbOn);
+            Panel e2 = Group(pg[2], "", 6, 4, 488, 256);
+            _bbOn = new CheckBox(); _bbOn.Text = "Enable Bass Boost"; _bbOn.AutoSize = true; _bbOn.BackColor = Color.Transparent; _bbOn.Location = new Point(18, 18); e2.Controls.Add(_bbOn);
             _vBbLevel = Cap(e2, "", 18, 66, 300, ContentAlignment.MiddleLeft);
             Cap(e2, "0%", 18, 98, 40, ContentAlignment.MiddleLeft);
             _bbLevel = HBar(e2, 56, 90, 380, 0, 100);
             Cap(e2, "100%", 442, 98, 44, ContentAlignment.MiddleLeft);
             _vBbCut = Cap(e2, "", 18, 150, 300, ContentAlignment.MiddleLeft);
             Cap(e2, "10 Hz", 18, 182, 50, ContentAlignment.MiddleLeft);
-            _bbCut = HBar(e2, 70, 174, 360, 10, 200);
-            Cap(e2, "200 Hz", 436, 182, 50, ContentAlignment.MiddleLeft);
+            _bbCut = HBar(e2, 66, 174, 370, 10, 200);
+            Cap(e2, "200 Hz", 442, 182, 46, ContentAlignment.MiddleLeft);
 
             // ---- احداث ----
             foreach (ComboBox cb in new ComboBox[] { _cmb1, _cmb2 })
@@ -76,14 +76,14 @@ namespace EaxReverbEngine
                 me.SelectedIndexChanged += delegate { if (!Loading) { Fx.SpeakerMode = me.SelectedIndex; Reload(); } };
             }
             _bmPct.ValueChanged += delegate { if (!Loading) { Fx.BmPercent = _bmPct.Value; Reload(); } };
-            _bmOn.CheckedChanged += delegate { if (!Loading) Fx.BmOn = _bmOn.Checked; };
+            _bmOn.CheckedChanged += delegate { if (!Loading) { Fx.BmOn = _bmOn.Checked; Reload(); } };
             _bmCross.ValueChanged += delegate { if (!Loading) { Fx.BmCrossover = _bmCross.Value; Reload(); } };
-            _bbOn.CheckedChanged += delegate { if (!Loading) Fx.BassOn = _bbOn.Checked; };
-            _bbLevel.ValueChanged += delegate { if (!Loading) { Fx.Bass = _bbLevel.Value; Reload(); } };
+            _bbOn.CheckedChanged += delegate { if (!Loading) { Fx.BassOn = _bbOn.Checked; Reload(); } };
+            _bbLevel.ValueChanged += delegate { if (!Loading) { Fx.Bass = _bbLevel.Value; if (Fx.Bass > 0.5f) Fx.BassOn = true; Reload(); } };
             _bbCut.ValueChanged += delegate { if (!Loading) { Fx.BassCutoff = _bbCut.Value; Reload(); } };
 
-            _tm.Interval = 400;
-            _tm.Tick += delegate { if (Fx.TestMode == 0 && _testState.Text.Length > 0) _testState.Text = ""; };
+            _tm.Interval = 500;
+            _tm.Tick += delegate { _bCh.Checked = Fx.TestMode == 1; _bNo.Checked = Fx.TestMode == 2; _bCh.Invalidate(); _bNo.Invalidate(); };
             VisibleChanged += delegate { _tm.Enabled = Visible; };
 
             Reload();
@@ -94,15 +94,17 @@ namespace EaxReverbEngine
             ComboBox c = new ComboBox();
             c.DropDownStyle = ComboBoxStyle.DropDownList;
             c.Items.AddRange(Modes);
-            c.SetBounds(x, y, 200, 21);
+            c.SetBounds(x, y, 208, 21);
             parent.Controls.Add(c);
             return c;
         }
 
         private void Toggle(int mode)
         {
-            if (Fx.TestMode == mode) { Fx.StopTest(); _testState.Text = ""; }
-            else { Fx.StartTest(mode); _testState.Text = mode == 1 ? "Playing: left / right" : "Playing: noise"; }
+            if (Fx.TestMode == mode) Fx.StopTest();
+            else Fx.StartTest(mode);
+            _bCh.Checked = Fx.TestMode == 1; _bNo.Checked = Fx.TestMode == 2;
+            _bCh.Invalidate(); _bNo.Invalidate();
         }
 
         protected override void DoDefault() { Fx.ResetSpeaker(); Fx.StopTest(); }
@@ -116,11 +118,11 @@ namespace EaxReverbEngine
                 _cmb1.SelectedIndex = Fx.SpeakerMode;
                 _cmb2.SelectedIndex = Fx.SpeakerMode;
                 _pic.Headphone = Fx.SpeakerMode == 0;
-                int pct = (int)Math.Round(Fx.BmPercent);
-                _bmPct.Value = pct; _vBmPct.Text = pct + "%";
+                _bmPct.Value = (int)Math.Round(Fx.BmPercent);
                 _bmOn.Checked = Fx.BmOn;
                 int cr = (int)Math.Round(Fx.BmCrossover);
-                _bmCross.Value = cr; _vBmCross.Text = "Crossover Frequency: " + cr + " Hz";
+                _bmCross.Value = cr;
+                _vBmCross.Text = "Crossover Frequency: " + cr + " Hz";
                 _bbOn.Checked = Fx.BassOn;
                 int lv = (int)Math.Round(Fx.Bass);
                 _bbLevel.Value = lv; _vBbLevel.Text = "Level: " + lv + " %";
