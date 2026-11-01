@@ -71,22 +71,35 @@ namespace EaxReverbEngine
             }
         }
 
-        // بطاقة بيضاء بحافة زرقاء (نفس شكل الايقونات المرجعية): ايقونة سوداء + تسمية غامقة تحتها
+        // بطاقة بحافة واضحة ثلاثية الابعاد (نفس اسلوب ازرار الدرايفر الاصلي SkinButton):
+        // قبل كانت الحافة فاتحة جدا على خلفية بيضاء فصارت شبه مختفية - صلحتها بحدود واضحة + تدرج + لمعة علوية
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             Rectangle r = new Rectangle(0, 0, Width - 1, Height - 1);
-            Color edge = _on ? Color.FromArgb(40, 110, 225) : (_hover ? Color.FromArgb(150, 170, 210) : Color.FromArgb(205, 208, 215));
-            Color bg = _on ? Color.FromArgb(227, 236, 250) : Color.White;
+            Color edge = _on ? Color.FromArgb(40, 110, 225) : (_hover ? Color.FromArgb(90, 130, 190) : Color.FromArgb(140, 140, 146));
+            Color top = _on ? Color.FromArgb(205, 225, 252) : (_hover ? Color.FromArgb(240, 243, 248) : Color.White);
+            Color bot = _on ? Color.FromArgb(150, 185, 235) : (_hover ? Color.FromArgb(222, 226, 233) : Color.FromArgb(222, 222, 226));
             Color fg = Color.FromArgb(35, 38, 46);
-            float edgeW = _on ? 2.2f : 1.3f;
+            float edgeW = _on ? 2.2f : 1.4f;
             using (GraphicsPath p = Round(r, 9))
             {
                 Rectangle sh = r; sh.Offset(0, 2);
                 using (GraphicsPath spth = Round(sh, 9))
-                using (Brush shb = new SolidBrush(Color.FromArgb(25, 0, 0, 0))) { g.FillPath(shb, spth); }
-                using (Brush b = new SolidBrush(bg)) { g.FillPath(b, p); }
+                using (Brush shb = new SolidBrush(Color.FromArgb(40, 0, 0, 0))) { g.FillPath(shb, spth); }
+                using (LinearGradientBrush b = new LinearGradientBrush(r, top, bot, 90f))
+                {
+                    Blend bl = new Blend();
+                    bl.Positions = new float[] { 0f, 0.5f, 0.5f, 1f };
+                    bl.Factors = new float[] { 0f, 0.55f, 0.75f, 1f };
+                    b.Blend = bl;
+                    g.FillPath(b, p);
+                }
+                g.SetClip(p);
+                using (Pen hi = new Pen(Color.FromArgb(200, 255, 255, 255), 1.3f)) { g.DrawLine(hi, r.X + 1, r.Y + 1, r.Right - 1, r.Y + 1); }
+                using (Pen sl = new Pen(Color.FromArgb(40, 0, 0, 0), 1.3f)) { g.DrawLine(sl, r.X + 1, r.Bottom - 1, r.Right - 1, r.Bottom - 1); }
+                g.ResetClip();
                 using (Pen pen = new Pen(edge, edgeW)) { g.DrawPath(pen, p); }
             }
             float cx = Width / 2f, cy = Height * 0.4f;
