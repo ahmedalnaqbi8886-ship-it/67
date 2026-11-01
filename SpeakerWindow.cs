@@ -8,7 +8,7 @@ namespace EaxReverbEngine
     internal sealed class SpeakerWindow : PanelBase
     {
         private static readonly string[] Modes = new string[] { "Headphone", "2 Speakers", "2.1 Speakers" };
-        private ComboBox _cmb1, _cmb2;
+        private ComboBox _cmb1;
         private RoomPic _pic;
         private SkinButton _bCh, _bNo;
         private CSlider _bmPct, _bmCross, _bbLevel, _bbCut;
@@ -46,7 +46,7 @@ namespace EaxReverbEngine
 
             // ---- Bass Management ----
             Panel c = Group(pg[1], "", 6, 4, 488, 100);
-            _cmb2 = Combo(c, 12, 12);
+            Cap(c, "Subwoofer Volume", 12, 10, 300, ContentAlignment.MiddleLeft);
             Cap(c, "0%", 12, 66, 40, ContentAlignment.MiddleLeft);
             _bmPct = HBar(c, 50, 58, 390, 0, 100);
             Cap(c, "100%", 446, 66, 40, ContentAlignment.MiddleLeft);
@@ -70,11 +70,7 @@ namespace EaxReverbEngine
             Cap(e2, "200 Hz", 442, 182, 46, ContentAlignment.MiddleLeft);
 
             // ---- احداث ----
-            foreach (ComboBox cb in new ComboBox[] { _cmb1, _cmb2 })
-            {
-                ComboBox me = cb;
-                me.SelectedIndexChanged += delegate { if (!Loading) { Fx.SpeakerMode = me.SelectedIndex; Reload(); } };
-            }
+            _cmb1.SelectedIndexChanged += delegate { if (!Loading) { Fx.SpeakerMode = _cmb1.SelectedIndex; Reload(); } };
             _bmPct.ValueChanged += delegate { if (!Loading) { Fx.BmPercent = _bmPct.Value; Reload(); } };
             _bmOn.CheckedChanged += delegate { if (!Loading) { Fx.BmOn = _bmOn.Checked; Reload(); } };
             _bmCross.ValueChanged += delegate { if (!Loading) { Fx.BmCrossover = _bmCross.Value; Reload(); } };
@@ -116,7 +112,6 @@ namespace EaxReverbEngine
             try
             {
                 _cmb1.SelectedIndex = Fx.SpeakerMode;
-                _cmb2.SelectedIndex = Fx.SpeakerMode;
                 _pic.Headphone = Fx.SpeakerMode == 0;
                 _bmPct.Value = (int)Math.Round(Fx.BmPercent);
                 _bmOn.Checked = Fx.BmOn;
