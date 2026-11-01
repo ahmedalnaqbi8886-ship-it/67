@@ -71,33 +71,39 @@ namespace EaxReverbEngine
             }
         }
 
+        // بطاقة بيضاء بحافة زرقاء (نفس شكل الايقونات المرجعية): ايقونة سوداء + تسمية غامقة تحتها
         protected override void OnPaint(PaintEventArgs e)
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             Rectangle r = new Rectangle(0, 0, Width - 1, Height - 1);
-            Color bg = _on ? Color.FromArgb(52, 120, 224) : (_hover ? Color.FromArgb(234, 238, 246) : Color.FromArgb(222, 225, 232));
-            Color fg = _on ? Color.White : Color.FromArgb(55, 60, 75);
-            using (GraphicsPath p = Round(r, 8))
+            Color edge = _on ? Color.FromArgb(40, 110, 225) : (_hover ? Color.FromArgb(150, 170, 210) : Color.FromArgb(205, 208, 215));
+            Color bg = _on ? Color.FromArgb(227, 236, 250) : Color.White;
+            Color fg = Color.FromArgb(35, 38, 46);
+            float edgeW = _on ? 2.2f : 1.3f;
+            using (GraphicsPath p = Round(r, 9))
             {
+                Rectangle sh = r; sh.Offset(0, 2);
+                using (GraphicsPath spth = Round(sh, 9))
+                using (Brush shb = new SolidBrush(Color.FromArgb(25, 0, 0, 0))) { g.FillPath(shb, spth); }
                 using (Brush b = new SolidBrush(bg)) { g.FillPath(b, p); }
-                using (Pen pen = new Pen(Color.FromArgb(120, 126, 140))) { g.DrawPath(pen, p); }
+                using (Pen pen = new Pen(edge, edgeW)) { g.DrawPath(pen, p); }
             }
-            float cx = Width / 2f, cy = 23f;
-            if (_kind == Kind.Bass) Speaker(g, cx - 3f, cy, 1.45f, fg, 3, 0);
+            float cx = Width / 2f, cy = Height * 0.4f;
+            if (_kind == Kind.Bass) Speaker(g, cx - 3f, cy, 1.3f, fg, 3, 0);
             else if (_kind == Kind.Stereo)
             {
-                Speaker(g, cx - 15f, cy, 0.95f, fg, 1, 0);
-                Speaker(g, cx + 11f, cy, 0.95f, fg, 1, 0);
+                Speaker(g, cx - 14f, cy, 0.85f, fg, 1, 0);
+                Speaker(g, cx + 10f, cy, 0.85f, fg, 1, 0);
             }
-            else Speaker(g, cx, cy, 1.1f, fg, 2, 2);
+            else Speaker(g, cx, cy, 1.0f, fg, 2, 2);
 
             using (StringFormat sf = new StringFormat())
             using (Brush tb = new SolidBrush(fg))
-            using (Font f = new Font("Tahoma", 7.5f, FontStyle.Bold))
+            using (Font f = new Font("Tahoma", 7.75f, FontStyle.Bold))
             {
                 sf.Alignment = StringAlignment.Center;
-                g.DrawString(Caption, f, tb, new RectangleF(0, Height - 19, Width, 16), sf);
+                g.DrawString(Caption, f, tb, new RectangleF(0, Height - 18, Width, 16), sf);
             }
         }
     }

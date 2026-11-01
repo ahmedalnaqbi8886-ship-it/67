@@ -310,6 +310,75 @@ namespace EaxReverbEngine
         }
     }
 
+    // زر "؟" مدمج مع سهم القائمة بقطعة واحدة (نفس شكل الاصلي: مقسوم بخط رفيع بالنص)
+    internal sealed class HelpArrowButton : Control
+    {
+        public event EventHandler HelpClick;
+        private bool _hoverL, _hoverR, _downL, _downR;
+
+        public HelpArrowButton()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
+            Size = new Size(58, 22);
+            Cursor = BlueCursor.Arrow;
+            Font = new Font("Tahoma", 10f, FontStyle.Bold);
+        }
+
+        private bool Left(Point p) { return p.X < Width / 2; }
+
+        protected override void OnMouseMove(MouseEventArgs e)
+        {
+            bool l = Left(e.Location);
+            if (_hoverL != l || _hoverR == l) { _hoverL = l; _hoverR = !l; Invalidate(); }
+            base.OnMouseMove(e);
+        }
+        protected override void OnMouseLeave(EventArgs e) { _hoverL = _hoverR = _downL = _downR = false; Invalidate(); base.OnMouseLeave(e); }
+        protected override void OnMouseDown(MouseEventArgs e)
+        {
+            if (Left(e.Location)) _downL = true; else _downR = true;
+            Invalidate();
+            base.OnMouseDown(e);
+        }
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            bool wasL = _downL;
+            _downL = _downR = false;
+            Invalidate();
+            if (wasL && Left(e.Location) && HelpClick != null) HelpClick(this, EventArgs.Empty);
+            base.OnMouseUp(e);
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            Rectangle r = new Rectangle(0, 0, Width - 1, Height - 1);
+            int mid = Width / 2;
+            using (GraphicsPath gp = Skin.Round(r, 6))
+            {
+                using (LinearGradientBrush b = new LinearGradientBrush(r, Color.White, Color.FromArgb(220, 220, 224), 90f)) { g.FillPath(b, gp); }
+                if (_hoverL || _downL)
+                {
+                    g.SetClip(gp);
+                    using (Brush hb = new SolidBrush(Color.FromArgb(_downL ? 70 : 35, 40, 120, 225))) { g.FillRectangle(hb, 0, 0, mid, Height); }
+                    g.ResetClip();
+                }
+                if (_hoverR || _downR)
+                {
+                    g.SetClip(gp);
+                    using (Brush hb = new SolidBrush(Color.FromArgb(_downR ? 70 : 35, 40, 120, 225))) { g.FillRectangle(hb, mid, 0, Width - mid, Height); }
+                    g.ResetClip();
+                }
+                using (Pen p = new Pen(Color.FromArgb(70, 70, 76), 1.4f)) { g.DrawPath(p, gp); }
+            }
+            using (Pen sep = new Pen(Color.FromArgb(170, 170, 176))) { g.DrawLine(sep, mid, 3, mid, Height - 4); }
+            TextRenderer.DrawText(g, "?", Font, new Rectangle(0, _downL ? 1 : 0, mid, Height), Skin.Blue, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            using (Brush ab = new SolidBrush(Skin.Blue))
+            { g.FillPolygon(ab, new Point[] { new Point(mid + 9, 9 + (_downR ? 1 : 0)), new Point(mid + 18, 9 + (_downR ? 1 : 0)), new Point(mid + 13, 15 + (_downR ? 1 : 0)) }); }
+        }
+    }
+
     // ايقونات الشريط السفلي (صور الاصلية + رسم لـ Stereo)
     internal sealed class BarIcon : Control
     {
@@ -485,26 +554,64 @@ namespace EaxReverbEngine
             { g.FillPolygon(b, new PointF[] { new PointF(Width, 0), new PointF(Width - 34, 24), new PointF(Width - 34, Height - 24), new PointF(Width, Height) }); }
             using (Brush b = new SolidBrush(Color.FromArgb(70, 120, 110, 100)))
             { g.FillRectangle(b, Width / 2 - 40, 6, 80, 12); }
+            // ظل ارضي ناعم تحت الجسم يعطي احساس عمق
+            using (Brush shb = new SolidBrush(Color.FromArgb(60, 40, 30, 10)))
+            { g.FillEllipse(shb, Width / 2 - 56, Height - 20, 112, 14); }
+
             if (_head)
             {
                 using (Pen band = new Pen(Color.FromArgb(25, 25, 28), 5f))
                 { g.DrawArc(band, Width / 2 - 38, 36, 76, 80, 180, 180); }
-                using (Brush cup = new SolidBrush(Color.FromArgb(30, 30, 34)))
-                {
-                    g.FillEllipse(cup, Width / 2 - 48, 76, 22, 34);
-                    g.FillEllipse(cup, Width / 2 + 26, 76, 22, 34);
-                }
+                Ear(g, Width / 2 - 37, 93);
+                Ear(g, Width / 2 + 37, 93);
             }
             else
             {
-                using (Brush cab = new SolidBrush(Color.FromArgb(28, 28, 32)))
-                using (Brush cone = new SolidBrush(Color.FromArgb(90, 90, 98)))
-                {
-                    g.FillRectangle(cab, 46, 48, 40, 64); g.FillRectangle(cab, Width - 86, 48, 40, 64);
-                    g.FillEllipse(cone, 52, 78, 28, 28); g.FillEllipse(cone, Width - 80, 78, 28, 28);
-                    g.FillEllipse(cone, 59, 56, 14, 14); g.FillEllipse(cone, Width - 73, 56, 14, 14);
-                }
+                Woofer(g, Width / 2 - 46, 80);
+                Woofer(g, Width / 2 + 46, 80);
             }
+        }
+
+        private static void Ear(Graphics g, float cx, float cy)
+        {
+            Rectangle r = new Rectangle((int)cx - 11, (int)cy - 17, 22, 34);
+            using (GraphicsPath p = new GraphicsPath()) { p.AddEllipse(r); }
+            using (GraphicsPath gp = new GraphicsPath()) { gp.AddEllipse(r); }
+            using (PathGradientBrush pg = new PathGradientBrush(gp))
+            {
+                pg.CenterPoint = new PointF(cx - 4, cy - 6);
+                pg.CenterColor = Color.FromArgb(90, 92, 98);
+                pg.SurroundColors = new Color[] { Color.FromArgb(14, 14, 17) };
+                g.FillEllipse(new SolidBrush(Color.FromArgb(14, 14, 17)), r);
+                g.FillPath(pg, gp);
+            }
+            using (Brush hi = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
+            { g.FillEllipse(hi, cx - 7, cy - 12, 7, 10); }
+        }
+
+        private static void Woofer(Graphics g, float cx, float cy)
+        {
+            using (Brush cab = new SolidBrush(Color.FromArgb(26, 26, 30)))
+            { g.FillRectangle(cab, cx - 20, cy - 32, 40, 64); }
+            using (LinearGradientBrush top = new LinearGradientBrush(new Rectangle((int)cx - 20, (int)cy - 32, 40, 64), Color.FromArgb(70, 255, 255, 255), Color.FromArgb(0, 0, 0, 0), 20f))
+            { g.FillRectangle(top, cx - 20, cy - 32, 40, 20); }
+            ConeRing(g, cx, cy + 8, 14f);
+            ConeRing(g, cx, cy - 16, 7f);
+        }
+
+        private static void ConeRing(Graphics g, float cx, float cy, float rad)
+        {
+            Rectangle r = new Rectangle((int)(cx - rad), (int)(cy - rad), (int)(rad * 2), (int)(rad * 2));
+            using (GraphicsPath gp = new GraphicsPath()) { gp.AddEllipse(r); }
+            using (PathGradientBrush pg = new PathGradientBrush(gp))
+            {
+                pg.CenterPoint = new PointF(cx - rad * 0.35f, cy - rad * 0.35f);
+                pg.CenterColor = Color.FromArgb(120, 122, 128);
+                pg.SurroundColors = new Color[] { Color.FromArgb(55, 55, 60) };
+                g.FillPath(pg, gp);
+            }
+            using (Pen edge = new Pen(Color.FromArgb(15, 15, 18), 1.4f)) { g.DrawEllipse(edge, r); }
+            using (Brush dot = new SolidBrush(Color.FromArgb(18, 18, 20))) { g.FillEllipse(dot, cx - rad * 0.22f, cy - rad * 0.22f, rad * 0.44f, rad * 0.44f); }
         }
     }
 

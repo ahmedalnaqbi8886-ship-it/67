@@ -81,24 +81,10 @@ namespace EaxReverbEngine
             dev.SetBounds(w - 295, 7, 170, 21);
             _head.Controls.Add(dev);
 
-            SkinButton help = new SkinButton();
-            help.Text = "?";
-            help.Font = new Font("Tahoma", 10f, FontStyle.Bold);
-            help.ForeColor = Skin.Blue;
-            help.SetBounds(w - 122, 7, 38, 22);
-            help.Click += delegate { MessageBox.Show(this, "Audio effects panel.\r\nEqualizer, Surround Mixer and Speaker Settings.", _title); };
+            HelpArrowButton help = new HelpArrowButton();
+            help.SetBounds(w - 122, 7, 58, 22);
+            help.HelpClick += delegate { MessageBox.Show(this, "Audio effects panel.\r\nEqualizer, Surround Mixer and Speaker Settings.", _title); };
             _head.Controls.Add(help);
-
-            SkinButton arrow = new SkinButton();
-            arrow.Text = "";
-            arrow.SetBounds(w - 84, 7, 20, 22);
-            arrow.Paint += delegate(object s, PaintEventArgs e)
-            {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                using (Brush b = new SolidBrush(Skin.Blue))
-                { e.Graphics.FillPolygon(b, new Point[] { new Point(5, 9), new Point(14, 9), new Point(9, 15) }); }
-            };
-            _head.Controls.Add(arrow);
 
             Label min = new Label();
             min.Text = "_"; min.Font = new Font("Tahoma", 10f, FontStyle.Bold);
