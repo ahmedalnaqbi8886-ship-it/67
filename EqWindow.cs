@@ -28,7 +28,7 @@ namespace EaxReverbEngine
         private BarIcon _bBass, _bStereo, _bSurround;
         private float _lastBass = 60f;
 
-        public EqWindow(FxChain fx) : base(fx, "eq", "Graphic Equalizer", 500, 241)
+        public EqWindow(FxChain fx) : base(fx, "eq", "Graphic Equalizer", 500, 311)
         {
             Panel strip = new Panel();
             strip.SetBounds(0, 0, 500, 25);
@@ -95,9 +95,9 @@ namespace EaxReverbEngine
             row.Controls.Add(del);
 
             // مقياس dB يسار (مواقع من اللقطة الاصلية)
-            Cap(Body, "12dB", 14, 77, 44, ContentAlignment.MiddleRight);
-            Cap(Body, "0dB", 14, 132, 44, ContentAlignment.MiddleRight);
-            Cap(Body, "-12dB", 14, 187, 44, ContentAlignment.MiddleRight);
+            Cap(Body, "12dB", 14, 147, 44, ContentAlignment.MiddleRight);
+            Cap(Body, "0dB", 14, 202, 44, ContentAlignment.MiddleRight);
+            Cap(Body, "-12dB", 14, 257, 44, ContentAlignment.MiddleRight);
 
             string[] names = new string[] { "125", "250", "500", "1k", "2k", "4k", "8k" };
             for (int i = 0; i < FxChain.Bands; i++)
@@ -110,7 +110,7 @@ namespace EaxReverbEngine
                 tb.Minimum = -12; tb.Maximum = 12;
                 tb.PadTop = 24; tb.PadBottom = 36;
                 tb.Text = names[i];
-                tb.SetBounds(64 + i * 47, 61, 34, 170);
+                tb.SetBounds(64 + i * 47, 131, 34, 170);
                 tb.ValueChanged += delegate
                 {
                     if (Loading) return;
@@ -121,39 +121,48 @@ namespace EaxReverbEngine
                 _band[i] = tb;
             }
 
-            Cap(Body, "0dB", 396, 83, 42, ContentAlignment.MiddleRight);
-            Cap(Body, "-24dB", 396, 180, 42, ContentAlignment.MiddleRight);
+            Cap(Body, "0dB", 396, 153, 42, ContentAlignment.MiddleRight);
+            Cap(Body, "-24dB", 396, 250, 42, ContentAlignment.MiddleRight);
             _lvl = new CSlider();
             _lvl.Kind = SliderKind.Eq;
             _lvl.Orientation = Orientation.Vertical;
             _lvl.Minimum = 0; _lvl.Maximum = 24;
             _lvl.PadTop = 30; _lvl.PadBottom = 43;
-            _lvl.SetBounds(446, 61, 34, 170);
+            _lvl.SetBounds(446, 131, 34, 170);
             _lvl.ValueChanged += delegate { if (!Loading) Fx.LevelDb = -_lvl.Value; };
             Body.Controls.Add(_lvl);
-            Cap(Body, "Level", 435, 214, 56, ContentAlignment.MiddleCenter);
+            Cap(Body, "Level", 435, 284, 56, ContentAlignment.MiddleCenter);
 
-            _bBass = AddToggle("bass", "Bass Boost", 232);
+            int bx = 130;
+            _bBass = new SpeakerButton(SpeakerButton.Kind.Bass, "Bass Boost");
+            _bBass.Location = new Point(bx, 54);
             _bBass.Click += delegate
             {
                 if (Fx.BassOn && Fx.Bass > 0.5f) { _lastBass = Fx.Bass; Fx.Bass = 0f; }
                 else { Fx.BassOn = true; Fx.Bass = _lastBass > 0.5f ? _lastBass : 60f; }
                 Reload();
             };
-            _bStereo = AddToggle("stereo", "Stereo", 264);
+            Body.Controls.Add(_bBass);
+
+            _bStereo = new SpeakerButton(SpeakerButton.Kind.Stereo, "Stereo");
+            _bStereo.Location = new Point(bx + 84, 54);
             _bStereo.Click += delegate
             {
                 Fx.StereoOn = !Fx.StereoOn;
                 if (Fx.StereoOn) Fx.Surround = 0f;
                 Reload();
             };
-            _bSurround = AddToggle("surround", "Surround", 296);
+            Body.Controls.Add(_bStereo);
+
+            _bSurround = new SpeakerButton(SpeakerButton.Kind.Surround, "Surround");
+            _bSurround.Location = new Point(bx + 168, 54);
             _bSurround.Click += delegate
             {
                 if (Fx.Surround > 0.5f) Fx.Surround = 0f;
                 else { Fx.Surround = 60f; Fx.StereoOn = false; }
                 Reload();
             };
+            Body.Controls.Add(_bSurround);
 
             RebuildPresets("*");
             Reload();
