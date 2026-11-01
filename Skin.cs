@@ -325,18 +325,18 @@ namespace EaxReverbEngine
             Font = new Font("Tahoma", 10f, FontStyle.Bold);
         }
 
-        private bool Left(Point p) { return p.X < Width / 2; }
+        private bool IsLeftSide(Point p) { return p.X < Width / 2; }
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            bool l = Left(e.Location);
+            bool l = IsLeftSide(e.Location);
             if (_hoverL != l || _hoverR == l) { _hoverL = l; _hoverR = !l; Invalidate(); }
             base.OnMouseMove(e);
         }
         protected override void OnMouseLeave(EventArgs e) { _hoverL = _hoverR = _downL = _downR = false; Invalidate(); base.OnMouseLeave(e); }
         protected override void OnMouseDown(MouseEventArgs e)
         {
-            if (Left(e.Location)) _downL = true; else _downR = true;
+            if (IsLeftSide(e.Location)) _downL = true; else _downR = true;
             Invalidate();
             base.OnMouseDown(e);
         }
@@ -345,7 +345,7 @@ namespace EaxReverbEngine
             bool wasL = _downL;
             _downL = _downR = false;
             Invalidate();
-            if (wasL && Left(e.Location) && HelpClick != null) HelpClick(this, EventArgs.Empty);
+            if (wasL && IsLeftSide(e.Location) && HelpClick != null) HelpClick(this, EventArgs.Empty);
             base.OnMouseUp(e);
         }
 
@@ -575,15 +575,17 @@ namespace EaxReverbEngine
         private static void Ear(Graphics g, float cx, float cy)
         {
             Rectangle r = new Rectangle((int)cx - 11, (int)cy - 17, 22, 34);
-            using (GraphicsPath p = new GraphicsPath()) { p.AddEllipse(r); }
-            using (GraphicsPath gp = new GraphicsPath()) { gp.AddEllipse(r); }
-            using (PathGradientBrush pg = new PathGradientBrush(gp))
+            using (GraphicsPath gp = new GraphicsPath())
             {
-                pg.CenterPoint = new PointF(cx - 4, cy - 6);
-                pg.CenterColor = Color.FromArgb(90, 92, 98);
-                pg.SurroundColors = new Color[] { Color.FromArgb(14, 14, 17) };
-                g.FillEllipse(new SolidBrush(Color.FromArgb(14, 14, 17)), r);
-                g.FillPath(pg, gp);
+                gp.AddEllipse(r);
+                using (PathGradientBrush pg = new PathGradientBrush(gp))
+                {
+                    pg.CenterPoint = new PointF(cx - 4, cy - 6);
+                    pg.CenterColor = Color.FromArgb(90, 92, 98);
+                    pg.SurroundColors = new Color[] { Color.FromArgb(14, 14, 17) };
+                    g.FillEllipse(new SolidBrush(Color.FromArgb(14, 14, 17)), r);
+                    g.FillPath(pg, gp);
+                }
             }
             using (Brush hi = new SolidBrush(Color.FromArgb(70, 255, 255, 255)))
             { g.FillEllipse(hi, cx - 7, cy - 12, 7, 10); }
@@ -602,13 +604,16 @@ namespace EaxReverbEngine
         private static void ConeRing(Graphics g, float cx, float cy, float rad)
         {
             Rectangle r = new Rectangle((int)(cx - rad), (int)(cy - rad), (int)(rad * 2), (int)(rad * 2));
-            using (GraphicsPath gp = new GraphicsPath()) { gp.AddEllipse(r); }
-            using (PathGradientBrush pg = new PathGradientBrush(gp))
+            using (GraphicsPath gp = new GraphicsPath())
             {
-                pg.CenterPoint = new PointF(cx - rad * 0.35f, cy - rad * 0.35f);
-                pg.CenterColor = Color.FromArgb(120, 122, 128);
-                pg.SurroundColors = new Color[] { Color.FromArgb(55, 55, 60) };
-                g.FillPath(pg, gp);
+                gp.AddEllipse(r);
+                using (PathGradientBrush pg = new PathGradientBrush(gp))
+                {
+                    pg.CenterPoint = new PointF(cx - rad * 0.35f, cy - rad * 0.35f);
+                    pg.CenterColor = Color.FromArgb(120, 122, 128);
+                    pg.SurroundColors = new Color[] { Color.FromArgb(55, 55, 60) };
+                    g.FillPath(pg, gp);
+                }
             }
             using (Pen edge = new Pen(Color.FromArgb(15, 15, 18), 1.4f)) { g.DrawEllipse(edge, r); }
             using (Brush dot = new SolidBrush(Color.FromArgb(18, 18, 20))) { g.FillEllipse(dot, cx - rad * 0.22f, cy - rad * 0.22f, rad * 0.44f, rad * 0.44f); }
