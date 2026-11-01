@@ -22,7 +22,7 @@ namespace EaxReverbEngine
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
             Size = new Size(72, 62);
-            Cursor = Cursors.Hand;
+            Cursor = BlueCursor.Arrow;
         }
 
         public bool On

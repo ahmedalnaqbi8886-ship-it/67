@@ -43,6 +43,9 @@ namespace EaxReverbEngine
 
             BuildHead(w);
             BuildBar(w, HeadH + h);
+            Cursor = BlueCursor.Arrow;
+            BlueCursor.Apply(this);
+            BlueCursor.Pin(this);
         }
 
         protected abstract void DoDefault();
@@ -108,14 +111,14 @@ namespace EaxReverbEngine
 
             Label min = new Label();
             min.Text = "—"; min.Font = new Font("Tahoma", 9f, FontStyle.Bold);
-            min.BackColor = Color.Transparent; min.Cursor = Cursors.Hand;
+            min.BackColor = Color.Transparent; min.Cursor = BlueCursor.Arrow;
             min.SetBounds(w - 66, 10, 24, 22); min.TextAlign = ContentAlignment.MiddleCenter;
             min.Click += delegate { WindowState = FormWindowState.Minimized; };
             _head.Controls.Add(min);
 
             Label close = new Label();
             close.Text = "X"; close.Font = new Font("Tahoma", 9f, FontStyle.Bold);
-            close.BackColor = Color.Transparent; close.Cursor = Cursors.Hand;
+            close.BackColor = Color.Transparent; close.Cursor = BlueCursor.Arrow;
             close.SetBounds(w - 38, 10, 24, 22); close.TextAlign = ContentAlignment.MiddleCenter;
             close.Click += delegate { Close(); };
             _head.Controls.Add(close);
@@ -237,7 +240,7 @@ namespace EaxReverbEngine
                 _names = names;
                 SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
                 Height = 32;
-                Cursor = Cursors.Hand;
+                Cursor = BlueCursor.Arrow;
             }
             public int Selected { get { return _sel; } set { if (value != _sel) { _sel = value; Invalidate(); if (Changed != null) Changed(this, EventArgs.Empty); } } }
             protected override void OnMouseDown(MouseEventArgs e)
@@ -278,7 +281,7 @@ namespace EaxReverbEngine
         protected override void OnVisibleChanged(EventArgs e)
         {
             base.OnVisibleChanged(e);
-            if (Visible) Reload();
+            if (Visible) { Reload(); BlueCursor.Apply(this); }
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

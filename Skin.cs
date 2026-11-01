@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace EaxReverbEngine
@@ -170,7 +171,7 @@ namespace EaxReverbEngine
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             Size = new Size(86, 24);
-            Cursor = Cursors.Hand;
+            Cursor = BlueCursor.Arrow;
             Font = new Font("Tahoma", 8f);
         }
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -207,7 +208,7 @@ namespace EaxReverbEngine
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
             BackColor = Color.Transparent;
             Size = new Size(30, 26);
-            Cursor = Cursors.Hand;
+            Cursor = BlueCursor.Arrow;
         }
         public bool On { get { return _on; } set { if (_on != value) { _on = value; Invalidate(); } } }
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
@@ -334,6 +335,95 @@ namespace EaxReverbEngine
                     g.FillEllipse(cone, 59, 56, 14, 14); g.FillEllipse(cone, Width - 73, 56, 14, 14);
                 }
             }
+        }
+    }
+
+    // مؤشر ماوس ازرق (يطبق على كل النوافذ وعلى نافذة الكرت نفسها)
+    internal static class BlueCursor
+    {
+        [StructLayout(LayoutKind.Sequential)]
+        private struct ICONINFO
+        {
+            public bool fIcon;
+            public int xHotspot;
+            public int yHotspot;
+            public IntPtr hbmMask;
+            public IntPtr hbmColor;
+        }
+        [DllImport("user32.dll")] private static extern bool GetIconInfo(IntPtr hIcon, out ICONINFO ii);
+        [DllImport("user32.dll")] private static extern IntPtr CreateIconIndirect(ref ICONINFO ii);
+        [DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr h);
+        [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr h);
+
+        private static Cursor _arrow;
+
+        public static Cursor Arrow
+        {
+            get
+            {
+                if (_arrow == null) _arrow = Make();
+                return _arrow;
+            }
+        }
+
+        private static Cursor Make()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                {
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        PointF[] pts = new PointF[]
+                        {
+                            new PointF(1.5f, 1.5f), new PointF(1.5f, 21f), new PointF(6.5f, 16.5f),
+                            new PointF(10.5f, 25f), new PointF(14f, 23.5f), new PointF(10f, 15.5f), new PointF(17f, 15.5f)
+                        };
+                        using (Brush b = new LinearGradientBrush(new Rectangle(0, 0, 18, 26), Color.FromArgb(90, 170, 255), Color.FromArgb(20, 90, 215), 90f))
+                        { g.FillPolygon(b, pts); }
+                        using (Pen p = new Pen(Color.White, 1.6f)) { p.LineJoin = LineJoin.Round; g.DrawPolygon(p, pts); }
+                    }
+                    IntPtr hIcon = bmp.GetHicon();
+                    ICONINFO ii;
+                    if (!GetIconInfo(hIcon, out ii)) { DestroyIcon(hIcon); return Cursors.Arrow; }
+                    ii.fIcon = false; ii.xHotspot = 1; ii.yHotspot = 1;
+                    IntPtr hCur = CreateIconIndirect(ref ii);
+                    if (ii.hbmMask != IntPtr.Zero) DeleteObject(ii.hbmMask);
+                    if (ii.hbmColor != IntPtr.Zero) DeleteObject(ii.hbmColor);
+                    DestroyIcon(hIcon);
+                    if (hCur == IntPtr.Zero) return Cursors.Arrow;
+                    return new Cursor(hCur);
+                }
+            }
+            catch (Exception) { return Cursors.Arrow; }
+        }
+
+        // يطبق المؤشر الازرق على نافذة وكل ما فيها، ويثبته حتى لو البرنامج غيّره
+        public static void Apply(Control root)
+        {
+            if (root == null) return;
+            try
+            {
+                Cursor c = Arrow;
+                root.Cursor = c;
+                foreach (Control ch in root.Controls) Apply(ch);
+                root.ControlAdded += delegate(object s, ControlEventArgs e) { Apply(e.Control); };
+            }
+            catch (Exception) { }
+        }
+
+        public static void Pin(Control form)
+        {
+            if (form == null) return;
+            try
+            {
+                Cursor c = Arrow;
+                form.MouseMove += delegate { if (!object.ReferenceEquals(form.Cursor, c)) form.Cursor = c; Cursor.Current = c; };
+                form.MouseDown += delegate { form.Cursor = c; Cursor.Current = c; };
+                form.MouseUp += delegate { form.Cursor = c; Cursor.Current = c; };
+            }
+            catch (Exception) { }
         }
     }
 }

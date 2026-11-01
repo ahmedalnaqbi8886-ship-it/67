@@ -17,7 +17,7 @@ namespace EaxReverbEngine
             _kind = kind; _cur = current;
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
             Size = new Size(30, 24);
-            Cursor = Cursors.Hand;
+            Cursor = BlueCursor.Arrow;
         }
 
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }

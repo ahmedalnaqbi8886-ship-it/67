@@ -292,6 +292,7 @@ namespace EaxReverbEngine
 				}
 				Action act = delegate()
 				{
+					try { BlueCursor.Apply(form as Control); BlueCursor.Pin(form as Control); } catch (Exception) { }
 					bool hooked = false;
 					try
 					{
