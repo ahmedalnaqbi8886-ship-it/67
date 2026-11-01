@@ -156,7 +156,14 @@ namespace EaxReverbEngine
                             using (Pen p = new Pen(Color.FromArgb(170, 170, 175))) { g.DrawPath(p, gp); }
                         }
                     }
-                    DrawThumb(g, new Rectangle(cx - 8, ty - 9, 16, 18), true);
+                    Bitmap mt = Assets.Get("thumb_v");
+                    if (mt != null)
+                    {
+                        g.SmoothingMode = SmoothingMode.None;
+                        g.DrawImage(mt, cx - mt.Width / 2, ty - mt.Height / 2, mt.Width, mt.Height);
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                    }
+                    else DrawThumb(g, new Rectangle(cx - 8, ty - 9, 16, 18), true);
                 }
             }
             else
@@ -165,13 +172,26 @@ namespace EaxReverbEngine
                 int left = PadTop;
                 int right = Width - PadBottom;
                 int tx = left + (int)Math.Round((right - left) * f);
-                Rectangle gv = new Rectangle(left - 4, cy - 3, right - left + 8, 6);
-                using (GraphicsPath gp = Skin.Round(gv, 3))
+                Bitmap gh = Assets.Get("groove_h");
+                g.SmoothingMode = SmoothingMode.None;
+                if (gh != null)
                 {
-                    using (Brush b = new SolidBrush(Color.FromArgb(205, 205, 208))) { g.FillPath(b, gp); }
-                    using (Pen p = new Pen(Color.FromArgb(170, 170, 175))) { g.DrawPath(p, gp); }
+                    for (int gx = left; gx < right; gx += gh.Width) g.DrawImage(gh, gx, cy - gh.Height / 2, Math.Min(gh.Width, right - gx), gh.Height);
                 }
-                DrawThumb(g, new Rectangle(tx - 9, cy - 8, 18, 16), false);
+                else
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    Rectangle gv = new Rectangle(left - 4, cy - 3, right - left + 8, 6);
+                    using (GraphicsPath gp = Skin.Round(gv, 3))
+                    {
+                        using (Brush b = new SolidBrush(Color.FromArgb(205, 205, 208))) { g.FillPath(b, gp); }
+                        using (Pen p = new Pen(Color.FromArgb(170, 170, 175))) { g.DrawPath(p, gp); }
+                    }
+                }
+                Bitmap ht = Assets.Get("thumb_h");
+                if (ht != null) g.DrawImage(ht, tx - ht.Width / 2, cy - ht.Height / 2, ht.Width, ht.Height);
+                else { g.SmoothingMode = SmoothingMode.AntiAlias; DrawThumb(g, new Rectangle(tx - 9, cy - 8, 18, 16), false); }
+                g.SmoothingMode = SmoothingMode.AntiAlias;
             }
         }
 
@@ -271,8 +291,6 @@ namespace EaxReverbEngine
                 case "eq": return "ic_grid";
                 case "speaker": return "ic_woof";
                 case "mixer": return "ic_caps";
-                case "bass": return "ic_plus";
-                case "surround": return "ic_swirl";
                 default: return null;
             }
         }
@@ -325,6 +343,81 @@ namespace EaxReverbEngine
         }
     }
 
+    // زر كبير بعلامة سماعة لتفعيل Bass Boost / Stereo / Surround (بدون اي شعار)
+    internal sealed class FxToggle : Control
+    {
+        public enum Kind { Bass, Stereo, Surround }
+        private readonly Kind _kind;
+        private bool _on, _hover;
+        public string Caption;
+
+        public FxToggle(Kind kind, string caption)
+        {
+            _kind = kind;
+            Caption = caption;
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
+                     ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
+            Size = new Size(64, 50);
+            Cursor = BlueCursor.Arrow;
+        }
+
+        public bool On { get { return _on; } set { if (_on != value) { _on = value; Invalidate(); } } }
+        protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
+        protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); base.OnMouseLeave(e); }
+
+        private static void Woofer(Graphics g, Brush face, Pen edge, float cx, float cy, float r)
+        {
+            g.FillEllipse(face, cx - r, cy - r, r * 2f, r * 2f);
+            g.DrawEllipse(edge, cx - r, cy - r, r * 2f, r * 2f);
+            g.FillEllipse(face, cx - r * 0.55f, cy - r * 0.55f, r * 1.1f, r * 1.1f);
+            g.DrawEllipse(edge, cx - r * 0.55f, cy - r * 0.55f, r * 1.1f, r * 1.1f);
+            using (Brush dot = new SolidBrush(Color.FromArgb(40, 42, 50)))
+            { g.FillEllipse(dot, cx - r * 0.18f, cy - r * 0.18f, r * 0.36f, r * 0.36f); }
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            bool lit = _on;
+            Color ring = lit ? Color.FromArgb(0, 95, 210) : (_hover ? Color.FromArgb(150, 150, 155) : Color.FromArgb(190, 190, 195));
+            Color fill = lit ? Color.FromArgb(220, 232, 250) : Color.White;
+            Rectangle box = new Rectangle(1, 1, Width - 3, 36);
+            using (GraphicsPath gp = Skin.Round(box, 7))
+            {
+                using (Brush b = new SolidBrush(fill)) { g.FillPath(b, gp); }
+                using (Pen p = new Pen(ring, lit ? 2f : 1.2f)) { g.DrawPath(p, gp); }
+            }
+            using (Brush face = new SolidBrush(Color.FromArgb(70, 70, 76)))
+            using (Pen edge = new Pen(Color.FromArgb(40, 40, 46), 1.3f))
+            using (Pen wave = new Pen(lit ? Color.FromArgb(0, 95, 210) : Color.FromArgb(110, 110, 115), 2f))
+            {
+                float cy = 19f;
+                if (_kind == Kind.Bass)
+                {
+                    Woofer(g, face, edge, Width / 2f, cy, 12f);
+                }
+                else if (_kind == Kind.Stereo)
+                {
+                    Woofer(g, face, edge, Width / 2f - 12f, cy, 8f);
+                    Woofer(g, face, edge, Width / 2f + 12f, cy, 8f);
+                }
+                else
+                {
+                    Woofer(g, face, edge, Width / 2f, cy, 9f);
+                    g.DrawArc(wave, Width / 2f - 20f, cy - 20f, 40f, 40f, 200, 140);
+                    g.DrawArc(wave, Width / 2f - 26f, cy - 26f, 52f, 52f, 200, 140);
+                }
+            }
+            using (Font f = new Font("Tahoma", 7.5f))
+            {
+                TextRenderer.DrawText(g, Caption, f, new Rectangle(0, 37, Width, 13), Color.FromArgb(40, 40, 46),
+                    TextFormatFlags.HorizontalCenter | TextFormatFlags.Top);
+            }
+        }
+    }
+
     // صورة غرفة الاختبار (سماعة راس او سماعتين)
     internal sealed class RoomPic : Control
     {
@@ -371,24 +464,14 @@ namespace EaxReverbEngine
         }
     }
 
-    // مؤشر ماوس ازرق (يطبق على كل النوافذ وعلى نافذة الكرت نفسها)
+    // مؤشر ماوس ازرق: يحمّل ملف الـ .cur الحقيقي عن طريق وندوز نفسه (اضمن من تركيب ايقونة يدوي)
     internal static class BlueCursor
     {
-        [StructLayout(LayoutKind.Sequential)]
-        private struct ICONINFO
-        {
-            public bool fIcon;
-            public int xHotspot;
-            public int yHotspot;
-            public IntPtr hbmMask;
-            public IntPtr hbmColor;
-        }
-        [DllImport("user32.dll")] private static extern bool GetIconInfo(IntPtr hIcon, out ICONINFO ii);
-        [DllImport("user32.dll")] private static extern IntPtr CreateIconIndirect(ref ICONINFO ii);
-        [DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr h);
-        [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr h);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern IntPtr LoadCursorFromFile(string path);
 
         private static Cursor _arrow;
+        private static string _curPath;
 
         public static Cursor Arrow
         {
@@ -403,42 +486,31 @@ namespace EaxReverbEngine
         {
             try
             {
+                string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CreativeEAXSettings");
+                Directory.CreateDirectory(dir);
+                _curPath = Path.Combine(dir, "pointer.cur");
                 byte[] raw = Convert.FromBase64String(CursorData.HandBlue);
-                return new Cursor(new System.IO.MemoryStream(raw));
+                bool write = true;
+                if (File.Exists(_curPath))
+                {
+                    try { write = new FileInfo(_curPath).Length != raw.Length; } catch (Exception) { }
+                }
+                if (write) File.WriteAllBytes(_curPath, raw);
+                IntPtr h = LoadCursorFromFile(_curPath);
+                if (h != IntPtr.Zero) return new Cursor(h);
             }
             catch (Exception) { }
             try
             {
-                using (Bitmap bmp = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
-                {
-                    using (Graphics g = Graphics.FromImage(bmp))
-                    {
-                        g.SmoothingMode = SmoothingMode.AntiAlias;
-                        PointF[] pts = new PointF[]
-                        {
-                            new PointF(1.5f, 1.5f), new PointF(1.5f, 21f), new PointF(6.5f, 16.5f),
-                            new PointF(10.5f, 25f), new PointF(14f, 23.5f), new PointF(10f, 15.5f), new PointF(17f, 15.5f)
-                        };
-                        using (Brush b = new LinearGradientBrush(new Rectangle(0, 0, 18, 26), Color.FromArgb(90, 170, 255), Color.FromArgb(20, 90, 215), 90f))
-                        { g.FillPolygon(b, pts); }
-                        using (Pen p = new Pen(Color.White, 1.6f)) { p.LineJoin = LineJoin.Round; g.DrawPolygon(p, pts); }
-                    }
-                    IntPtr hIcon = bmp.GetHicon();
-                    ICONINFO ii;
-                    if (!GetIconInfo(hIcon, out ii)) { DestroyIcon(hIcon); return Cursors.Arrow; }
-                    ii.fIcon = false; ii.xHotspot = 1; ii.yHotspot = 1;
-                    IntPtr hCur = CreateIconIndirect(ref ii);
-                    if (ii.hbmMask != IntPtr.Zero) DeleteObject(ii.hbmMask);
-                    if (ii.hbmColor != IntPtr.Zero) DeleteObject(ii.hbmColor);
-                    DestroyIcon(hIcon);
-                    if (hCur == IntPtr.Zero) return Cursors.Arrow;
-                    return new Cursor(hCur);
-                }
+                // محاولة ثانية: تحميل مباشر من الذاكرة (يعمل على اغلب انظمة ويندوز)
+                byte[] raw = Convert.FromBase64String(CursorData.HandBlue);
+                return new Cursor(new MemoryStream(raw));
             }
-            catch (Exception) { return Cursors.Arrow; }
+            catch (Exception) { }
+            return Cursors.Hand;   // لا نستخدم اي رسم يدوي بديل، تفاديا لمؤشر اسود
         }
 
-        // يطبق المؤشر الازرق على نافذة وكل ما فيها، ويثبته حتى لو البرنامج غيّره
+        // يطبق المؤشر على نافذة وكل ما فيها (مرة وحدة عند الانشاء)
         public static void Apply(Control root)
         {
             if (root == null) return;
@@ -457,9 +529,7 @@ namespace EaxReverbEngine
             try
             {
                 Cursor c = Arrow;
-                form.MouseMove += delegate { if (!object.ReferenceEquals(form.Cursor, c)) form.Cursor = c; Cursor.Current = c; };
-                form.MouseDown += delegate { form.Cursor = c; Cursor.Current = c; };
-                form.MouseUp += delegate { form.Cursor = c; Cursor.Current = c; };
+                form.MouseMove += delegate { Cursor.Current = c; };
             }
             catch (Exception) { }
         }

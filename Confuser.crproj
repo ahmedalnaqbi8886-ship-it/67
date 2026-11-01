@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<project outputDir="obf" baseDir="out" xmlns="http://confuser.codeplex.com">
+  <rule pattern="true" preset="normal" inherit="false">
+    <setting name="rename" value="true" />
+    <setting name="renPublic" value="false" />
+    <setting name="controlFlow" value="true" />
+    <setting name="constants" value="true" />
+    <setting name="refProxy" value="true" />
+    <setting name="antiDump" value="false" />
+    <setting name="antiDebug" value="false" />
+    <setting name="antiTamper" value="false" />
+    <setting name="antiILDasm" value="false" />
+    <setting name="invalidMetadata" value="false" />
+    <setting name="watermark" value="false" />
+    <setting name="compressor" value="false" />
+  </rule>
+  <module path="EaxReverbEngine.dll" />
+</project>

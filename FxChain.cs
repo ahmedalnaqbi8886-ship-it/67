@@ -261,12 +261,29 @@ namespace EaxReverbEngine
                         r[i] = sr + amt * (float)Math.Tanh((sr - _lp[1]) * 4f);
                     }
                 }
-                if (_stereoOn || _surround > 0.5f)
+                if (_stereoOn)
                 {
-                    // عرض ستيريو: نوسّع الجانب + نضيف تأخير قصير من الوسط (يسمع حتى لو الصوت مونو)
-                    float k = _stereoOn ? 2.2f : 1f + _surround * 0.01f * 1.5f;
-                    float dm = _stereoOn ? 0.45f : _surround * 0.01f * 0.6f;
-                    int dl = (int)(_fs * (_stereoOn ? 0.014f : 0.022f));
+                    // ستيريو حقيقي: القناة اليسرى كما هي، واليمنى نسخة متأخرة زمنياً (حيلة Haas)
+                    // + فرق بسيط بالتردد بين القناتين حتى تحس فرق يمين/يسار واضح بالسماعة
+                    int dl = (int)(_fs * 0.021f);
+                    if (dl < 8) dl = 8;
+                    if (dl >= _dly.Length) dl = _dly.Length - 1;
+                    for (int i = 0; i < n; i++)
+                    {
+                        float src = l[i];
+                        int rp = _dlyPos - dl; if (rp < 0) rp += _dly.Length;
+                        float delayed = _dly[rp];
+                        _dly[_dlyPos] = src;
+                        _dlyPos++; if (_dlyPos >= _dly.Length) _dlyPos = 0;
+                        l[i] = src * 0.92f;
+                        r[i] = delayed * 0.92f + src * 0.18f;
+                    }
+                }
+                else if (_surround > 0.5f)
+                {
+                    float k = 1f + _surround * 0.01f * 1.5f;
+                    float dm = _surround * 0.01f * 0.6f;
+                    int dl = (int)(_fs * 0.022f);
                     if (dl < 8) dl = 8;
                     if (dl >= _dly.Length) dl = _dly.Length - 1;
                     for (int i = 0; i < n; i++)
