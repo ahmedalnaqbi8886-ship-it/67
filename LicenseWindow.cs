@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Threading;
 using System.Windows.Forms;
 
 namespace EaxReverbEngine
@@ -46,15 +45,20 @@ namespace EaxReverbEngine
     {
         public bool Activated;
         private readonly TextBox _key = new TextBox();
+        private readonly TextBox _hw = new TextBox();
         private readonly Label _status = new Label();
+        private readonly SkinButton _act = new SkinButton();
+        private readonly SkinButton _close = new SkinButton();
 
         public LicenseWindow(LicState initial)
         {
             Text = "Activation";
-            FormBorderStyle = FormBorderStyle.FixedDialog;
-            MaximizeBox = false; MinimizeBox = false;
+            // نافذة قابلة للتمديد حتى يقدر العميل يكبّرها ويشوف/يسحب الكي بسهولة
+            FormBorderStyle = FormBorderStyle.Sizable;
+            MaximizeBox = true; MinimizeBox = true;
+            MinimumSize = new Size(440, 300);
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(480, 300);
+            ClientSize = new Size(520, 360);
             Font = new Font("Tahoma", 8.25f);
             BackColor = Color.White;
             Cursor = BlueCursor.Arrow;
@@ -62,66 +66,103 @@ namespace EaxReverbEngine
             Label title = new Label();
             title.Text = "Activate your subscription";
             title.Font = new Font("Tahoma", 11f, FontStyle.Bold);
-            title.SetBounds(16, 14, 440, 22);
+            title.SetBounds(16, 14, 480, 22);
+            title.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Controls.Add(title);
 
             Label plans = new Label();
             plans.Text = "Plans: Weekly  |  Monthly  |  Lifetime  (bound to this device)";
             plans.ForeColor = Color.FromArgb(90, 90, 90);
-            plans.SetBounds(16, 40, 450, 16);
+            plans.SetBounds(16, 40, 480, 16);
+            plans.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Controls.Add(plans);
 
             Label h = new Label();
             h.Text = "Your device ID (HWID) - send it to get a key:";
-            h.SetBounds(16, 68, 450, 16);
+            h.SetBounds(16, 68, 480, 16);
+            h.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Controls.Add(h);
 
-            TextBox hw = new TextBox();
-            hw.ReadOnly = true;
-            hw.Text = License.HwidPretty();
-            hw.Font = new Font("Consolas", 11f, FontStyle.Bold);
-            hw.SetBounds(16, 88, 350, 26);
-            Controls.Add(hw);
+            _hw.ReadOnly = true;
+            _hw.Text = License.HwidPretty();
+            _hw.Font = new Font("Consolas", 12f, FontStyle.Bold);
+            _hw.SetBounds(16, 88, 384, 28);
+            _hw.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            // اضغطة بسيطة تسهّل التحديد: تحديد كامل تلقائي عند الدخول، وتحديد بالنقر
+            _hw.Enter += delegate { _hw.SelectAll(); };
+            _hw.Click += delegate { _hw.SelectAll(); };
+            Controls.Add(_hw);
 
             SkinButton copy = new SkinButton();
             copy.Text = "Copy";
-            copy.SetBounds(376, 88, 88, 26);
+            copy.SetBounds(406, 88, 98, 28);
+            copy.Anchor = AnchorStyles.Top | AnchorStyles.Right;
             copy.Click += delegate
             {
-                try { Clipboard.SetText(hw.Text); _status.ForeColor = Color.FromArgb(0, 120, 0); _status.Text = "HWID copied."; } catch (Exception) { }
+                try { Clipboard.SetText(_hw.Text); Flash("HWID copied.", false); } catch (Exception) { }
             };
             Controls.Add(copy);
 
             Label k = new Label();
-            k.Text = "License key:";
-            k.SetBounds(16, 128, 300, 16);
+            k.Text = "License key (paste the one you received):";
+            k.SetBounds(16, 128, 400, 16);
+            k.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             Controls.Add(k);
 
             _key.Multiline = true;
-            _key.SetBounds(16, 148, 448, 62);
-            _key.Font = new Font("Consolas", 9f);
+            _key.SetBounds(16, 148, 488, 110);
+            _key.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom;
+            _key.Font = new Font("Consolas", 10f);
             _key.ScrollBars = ScrollBars.Vertical;
+            _key.WordWrap = true;
+            _key.AcceptsReturn = true;
+            _key.AcceptsTab = false;
             Controls.Add(_key);
 
-            _status.SetBounds(16, 218, 448, 18);
+            SkinButton selAll = new SkinButton();
+            selAll.Text = "Select All";
+            selAll.SetBounds(16, 264, 98, 24);
+            selAll.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            selAll.Click += delegate { _key.Focus(); _key.SelectAll(); };
+            Controls.Add(selAll);
+
+            SkinButton paste = new SkinButton();
+            paste.Text = "Paste";
+            paste.SetBounds(120, 264, 98, 24);
+            paste.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+            paste.Click += delegate
+            {
+                try { if (Clipboard.ContainsText()) { _key.Text = Clipboard.GetText(); _key.Focus(); _key.SelectAll(); } } catch (Exception) { }
+            };
+            Controls.Add(paste);
+
+            _status.SetBounds(16, 294, 488, 18);
+            _status.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
             _status.ForeColor = Color.FromArgb(190, 0, 0);
             _status.Text = initial == LicState.NoKey ? "" : License.Describe(initial);
             Controls.Add(_status);
 
-            SkinButton act = new SkinButton();
-            act.Text = "Activate";
-            act.SetBounds(262, 252, 100, 28);
-            act.Click += delegate { Activate(); };
-            Controls.Add(act);
+            _act.Text = "Activate";
+            _act.SetBounds(324, 322, 90, 28);
+            _act.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            _act.Click += delegate { Activate(); };
+            Controls.Add(_act);
 
-            SkinButton exit = new SkinButton();
-            exit.Text = "Close";
-            exit.SetBounds(370, 252, 94, 28);
-            exit.Click += delegate { Close(); };
-            Controls.Add(exit);
+            _close.Text = "Close";
+            _close.SetBounds(420, 322, 84, 28);
+            _close.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            _close.Click += delegate { Close(); };
+            Controls.Add(_close);
 
+            AcceptButton = null;
             string old = License.Load();
             if (!string.IsNullOrEmpty(old)) _key.Text = old;
+        }
+
+        private void Flash(string msg, bool error)
+        {
+            _status.ForeColor = error ? Color.FromArgb(190, 0, 0) : Color.FromArgb(0, 120, 0);
+            _status.Text = msg;
         }
 
         private void Activate()
@@ -132,14 +173,12 @@ namespace EaxReverbEngine
             {
                 License.Store(key);
                 Activated = true;
-                _status.ForeColor = Color.FromArgb(0, 120, 0);
-                _status.Text = License.Describe(s);
+                Flash(License.Describe(s), false);
                 Close();
             }
             else
             {
-                _status.ForeColor = Color.FromArgb(190, 0, 0);
-                _status.Text = License.Describe(s);
+                Flash(License.Describe(s), true);
             }
         }
     }

@@ -215,7 +215,7 @@ namespace EaxReverbEngine
 					});
 					return;
 				}
-				if (!Wave.PickOutFormatReal(num10, num5, num6, out num11, out num12))
+				if (!Wave.PickOutFormatReal(num10, num5, 2, out num11, out num12))  // نفضل ستيريو دائماً لجهاز الاخراج، حتى لو المايك مونو
 				{
 					Log.Write("render device [{0}] '{1}' busy or unsupported, aborting audio", new object[]
 					{
@@ -256,7 +256,7 @@ namespace EaxReverbEngine
 						list.Add(num9);
 						int num14;
 						int num15;
-						if (Wave.PickOutFormatReal(num9, num5, num6, out num14, out num15))
+						if (Wave.PickOutFormatReal(num9, num5, 2, out num14, out num15))  // نفضل ستيريو دائماً لجهاز الاخراج
 						{
 							num10 = num9;
 							num11 = num14;
