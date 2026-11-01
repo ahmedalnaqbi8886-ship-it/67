@@ -173,12 +173,18 @@ namespace EaxReverbEngine
             p.SetBounds(x, y, w, h);
             p.Paint += delegate(object s, PaintEventArgs e)
             {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                Graphics g = e.Graphics;
+                g.SmoothingMode = SmoothingMode.AntiAlias;
                 Rectangle r = new Rectangle(0, 0, p.Width - 1, p.Height - 1);
                 using (GraphicsPath gp = Skin.Round(r, 7))
                 {
-                    using (Brush b = new SolidBrush(Skin.Panel)) { e.Graphics.FillPath(b, gp); }
-                    using (Pen pe = new Pen(Color.FromArgb(231, 227, 231))) { e.Graphics.DrawPath(pe, gp); }
+                    using (Brush b = new SolidBrush(Skin.Panel)) { g.FillPath(b, gp); }
+                    // شكل ثلاثي الابعاد غائر (Sunken): ظل داخلي فوق + لمعة داخلية تحت
+                    g.SetClip(gp);
+                    using (Pen inTop = new Pen(Color.FromArgb(60, 0, 0, 0), 2f)) { g.DrawLine(inTop, r.X, r.Y + 1, r.Right, r.Y + 1); }
+                    using (Pen inBot = new Pen(Color.FromArgb(140, 255, 255, 255), 1.4f)) { g.DrawLine(inBot, r.X + 1, r.Bottom, r.Right - 1, r.Bottom); }
+                    g.ResetClip();
+                    using (Pen pe = new Pen(Color.FromArgb(165, 160, 165))) { g.DrawPath(pe, gp); }
                 }
             };
             p.BackColor = Skin.Back;

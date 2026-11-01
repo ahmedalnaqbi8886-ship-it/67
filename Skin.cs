@@ -127,6 +127,10 @@ namespace EaxReverbEngine
                     if (Column)
                     {
                         using (Brush b = new SolidBrush(Skin.EqCol)) { g.FillRectangle(b, 0, 0, Width - 1, Height - 1); }
+                        // غائر خفيف حول العمود
+                        using (Pen inTop = new Pen(Color.FromArgb(50, 0, 0, 0))) { g.DrawLine(inTop, 1, 1, Width - 2, 1); }
+                        using (Pen inLft = new Pen(Color.FromArgb(50, 0, 0, 0))) { g.DrawLine(inLft, 1, 1, 1, Height - 2); }
+                        using (Pen inBot = new Pen(Color.FromArgb(160, 255, 255, 255))) { g.DrawLine(inBot, 1, Height - 2, Width - 2, Height - 2); }
                         using (Pen p = new Pen(Skin.ColEdge)) { g.DrawRectangle(p, 0, 0, Width - 1, Height - 1); }
                         DrawTicks(g, top, bot, cx);
                     }
@@ -220,14 +224,38 @@ namespace EaxReverbEngine
             g.SmoothingMode = SmoothingMode.AntiAlias;
         }
 
+        // مقبض ثلاثي الابعاد: ظل تحته + لمعة علوية + انعكاس زجاجي (نفس شكل Creative)
         private static void DrawThumb(Graphics g, Rectangle th, bool vert)
         {
+            Rectangle sh = th; sh.Offset(0, 2);
+            using (GraphicsPath sgp = Skin.Round(sh, 3))
+            using (Brush sb = new SolidBrush(Color.FromArgb(55, 0, 0, 0))) { g.FillPath(sb, sgp); }
+
             using (GraphicsPath gp = Skin.Round(th, 3))
             {
-                using (LinearGradientBrush b = new LinearGradientBrush(th, Color.FromArgb(255, 255, 255), Color.FromArgb(205, 205, 210), vert ? 90f : 90f))
-                { g.FillPath(b, gp); }
-                using (Pen p = new Pen(Color.FromArgb(125, 125, 130))) { g.DrawPath(p, gp); }
+                using (LinearGradientBrush b = new LinearGradientBrush(th, Color.FromArgb(255, 255, 255), Color.FromArgb(188, 188, 194), 90f))
+                {
+                    b.Blend = Gloss();
+                    g.FillPath(b, gp);
+                }
+                using (Pen edge = new Pen(Color.FromArgb(110, 110, 116))) { g.DrawPath(edge, gp); }
             }
+            // خط لمعان رفيع اعلى المقبض
+            Rectangle hi = new Rectangle(th.X + 2, th.Y + 1, th.Width - 4, Math.Max(2, th.Height / 3));
+            using (GraphicsPath hgp = Skin.Round(hi, 2))
+            using (Brush hb = new SolidBrush(Color.FromArgb(150, 255, 255, 255))) { g.FillPath(hb, hgp); }
+        }
+
+        private static Blend _gloss;
+        private static Blend Gloss()
+        {
+            if (_gloss == null)
+            {
+                _gloss = new Blend();
+                _gloss.Positions = new float[] { 0f, 0.42f, 0.5f, 1f };
+                _gloss.Factors = new float[] { 0f, 0.55f, 0.8f, 1f };
+            }
+            return _gloss;
         }
     }
 
@@ -259,9 +287,24 @@ namespace EaxReverbEngine
             if (_down) { Color t = c1; c1 = c2; c2 = t; }
             using (GraphicsPath gp = Skin.Round(r, 6))
             {
-                using (LinearGradientBrush b = new LinearGradientBrush(r, c1, c2, 90f)) { g.FillPath(b, gp); }
+                using (LinearGradientBrush b = new LinearGradientBrush(r, c1, c2, 90f))
+                {
+                    Blend bl = new Blend();
+                    bl.Positions = new float[] { 0f, 0.5f, 0.5f, 1f };
+                    bl.Factors = new float[] { 0f, 0.55f, 0.75f, 1f };
+                    b.Blend = bl;
+                    g.FillPath(b, gp);
+                }
+                // زر ثلاثي الابعاد بارز: لمعة علوية رفيعة + ظل سفلي خفيف
+                g.SetClip(gp);
+                using (Pen hi = new Pen(Color.FromArgb(_down ? 40 : 200, 255, 255, 255), 1.3f))
+                { g.DrawLine(hi, r.X + 1, r.Y + 1, r.Right - 1, r.Y + 1); }
+                using (Pen sh = new Pen(Color.FromArgb(_down ? 0 : 45, 0, 0, 0), 1.3f))
+                { g.DrawLine(sh, r.X + 1, r.Bottom - 1, r.Right - 1, r.Bottom - 1); }
+                g.ResetClip();
                 using (Pen p = new Pen(Color.FromArgb(70, 70, 76), 1.4f)) { g.DrawPath(p, gp); }
             }
+            if (_down) g.TranslateTransform(0f, 1f);
             TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), ForeColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
