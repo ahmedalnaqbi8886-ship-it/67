@@ -118,4 +118,24 @@ namespace EaxReverbEngine
             }
         }
     }
+
+    // نص عمودي (مثل ادوات Creative)
+    internal sealed class VLabel : Control
+    {
+        public VLabel()
+        {
+            SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
+            Size = new Size(16, 80);
+        }
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            g.TranslateTransform(0, Height);
+            g.RotateTransform(-90f);
+            using (Brush b = new SolidBrush(Color.Black))
+            { g.DrawString(Text, Font, b, 0f, 0f); }
+        }
+    }
 }

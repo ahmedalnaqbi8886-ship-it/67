@@ -8,11 +8,13 @@ namespace EaxReverbEngine
 {
     internal static class Skin
     {
-        public static readonly Color Back = Color.FromArgb(238, 238, 238);
-        public static readonly Color Panel = Color.FromArgb(217, 217, 217);
-        public static readonly Color PanelEdge = Color.FromArgb(190, 190, 190);
+        public static readonly Color Back = Color.FromArgb(255, 255, 255);
+        public static readonly Color Panel = Color.FromArgb(222, 219, 222);
+        public static readonly Color PanelEdge = Color.FromArgb(206, 202, 206);
+        public static readonly Color EqCol = Color.FromArgb(219, 223, 219);
+        public static readonly Color ColEdge = Color.FromArgb(173, 170, 173);
         public static readonly Color Dark = Color.FromArgb(60, 60, 64);
-        public static readonly Color Blue = Color.FromArgb(70, 135, 230);
+        public static readonly Color Blue = Color.FromArgb(0, 95, 210);
 
         public static GraphicsPath Round(Rectangle r, int rad)
         {
@@ -20,6 +22,7 @@ namespace EaxReverbEngine
             int d = rad * 2;
             if (d > r.Height) d = r.Height;
             if (d > r.Width) d = r.Width;
+            if (d < 1) d = 1;
             p.AddArc(r.X, r.Y, d, d, 180, 90);
             p.AddArc(r.Right - d, r.Y, d, d, 270, 90);
             p.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
@@ -29,12 +32,17 @@ namespace EaxReverbEngine
         }
     }
 
-    // منزلق مرسوم بالكود (نفس شكل Creative: مجرى غامق + مقبض فاتح بخط ازرق)
+    internal enum SliderKind { Eq, Mixer, Horiz }
+
+    // منزلق مرسوم بالكود بنفس شكل الاصلي
     internal sealed class CSlider : Control
     {
         private int _min, _max = 100, _val;
         private bool _vert, _drag;
-        public bool Ticks;
+        public SliderKind Kind = SliderKind.Mixer;
+        public bool Column;          // رسم عمود EQ (خلفية + حدود + ارقام + تدريج)
+        public bool DarkGroove;      // مجرى غامق (المنزلقات النشطة في Mixer)
+        public int PadTop = 10, PadBottom = 10;
         public int TickFrequency = 10;
         public event EventHandler ValueChanged;
 
@@ -67,19 +75,16 @@ namespace EaxReverbEngine
             }
         }
 
-        private float Frac()
-        {
-            return _max == _min ? 0f : (float)(_val - _min) / (float)(_max - _min);
-        }
+        private float Frac() { return _max == _min ? 0f : (float)(_val - _min) / (float)(_max - _min); }
 
-        private int Pad { get { return 10; } }
+        private int Lo { get { return _vert ? PadTop : PadTop; } }
+        private int Span { get { return _vert ? Math.Max(1, Height - PadTop - PadBottom) : Math.Max(1, Width - PadTop - PadBottom); } }
 
         private void FromMouse(Point p)
         {
-            float f;
-            if (_vert) f = (p.Y - Pad) / (float)Math.Max(1, Height - 2 * Pad);
-            else f = (p.X - Pad) / (float)Math.Max(1, Width - 2 * Pad);
-            if (f < 0f) f = 0f; if (f > 1f) f = 1f;
+            float f = ((_vert ? p.Y : p.X) - PadTop) / (float)Span;
+            if (f < 0f) f = 0f;
+            if (f > 1f) f = 1f;
             Value = _min + (int)Math.Round(f * (_max - _min));
         }
 
@@ -113,50 +118,94 @@ namespace EaxReverbEngine
             if (_vert)
             {
                 int cx = Width / 2;
-                Rectangle groove = new Rectangle(cx - 3, Pad - 4, 6, Height - 2 * Pad + 8);
-                using (GraphicsPath gp = Skin.Round(groove, 3))
-                using (LinearGradientBrush b = new LinearGradientBrush(groove, Color.FromArgb(40, 40, 44), Color.FromArgb(130, 130, 135), 0f))
-                { g.FillPath(b, gp); }
-                if (Ticks)
+                int top = PadTop;
+                int bot = Height - PadBottom;
+                int ty = top + (int)Math.Round((bot - top) * f);
+                if (Kind == SliderKind.Eq)
                 {
-                    using (Pen tp = new Pen(Color.FromArgb(150, 150, 150)))
+                    if (Column)
                     {
-                        for (int i = 0; i <= 8; i++)
-                        {
-                            int y = Pad + (int)((Height - 2 * Pad) * i / 8f);
-                            g.DrawLine(tp, cx - 12, y, cx - 7, y); g.DrawLine(tp, cx + 7, y, cx + 12, y);
-                        }
+                        using (Brush b = new SolidBrush(Skin.EqCol)) { g.FillRectangle(b, 0, 0, Width - 1, Height - 1); }
+                        using (Pen p = new Pen(Skin.ColEdge)) { g.DrawRectangle(p, 0, 0, Width - 1, Height - 1); }
+                        DrawTicks(g, top, bot, cx);
+                    }
+                    Rectangle gv = new Rectangle(cx - 2, top - 12, 4, bot - top + 24);
+                    using (LinearGradientBrush b = new LinearGradientBrush(gv, Color.FromArgb(91, 90, 91), Color.FromArgb(150, 150, 150), 0f))
+                    { g.FillRectangle(b, gv); }
+                    Bitmap tb = Assets.Get("thumb_v");
+                    if (tb != null) { g.SmoothingMode = SmoothingMode.None; g.DrawImage(tb, cx - tb.Width / 2, ty - tb.Height / 2, tb.Width, tb.Height); }
+                    else DrawThumb(g, new Rectangle(cx - 8, ty - 12, 16, 24), true);
+                    if (Column && !string.IsNullOrEmpty(Text))
+                    {
+                        using (Font ft = new Font("Tahoma", 9f, FontStyle.Bold))
+                        { TextRenderer.DrawText(g, Text, ft, new Rectangle(0, Height - 24, Width, 20), Color.FromArgb(60, 60, 60), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); }
                     }
                 }
-                int ty = Pad + (int)Math.Round((Height - 2 * Pad) * f);
-                Rectangle th = new Rectangle(cx - 11, ty - 7, 22, 14);
-                DrawThumb(g, th, true);
+                else
+                {
+                    Rectangle gv = new Rectangle(cx - 3, top - 4, 6, bot - top + 8);
+                    using (GraphicsPath gp = Skin.Round(gv, 3))
+                    {
+                        if (DarkGroove)
+                        {
+                            using (LinearGradientBrush b = new LinearGradientBrush(gv, Color.FromArgb(41, 40, 41), Color.FromArgb(163, 162, 163), 0f)) { g.FillPath(b, gp); }
+                        }
+                        else
+                        {
+                            using (Brush b = new SolidBrush(Color.FromArgb(205, 205, 208))) { g.FillPath(b, gp); }
+                            using (Pen p = new Pen(Color.FromArgb(170, 170, 175))) { g.DrawPath(p, gp); }
+                        }
+                    }
+                    DrawThumb(g, new Rectangle(cx - 8, ty - 9, 16, 18), true);
+                }
             }
             else
             {
                 int cy = Height / 2;
-                Rectangle groove = new Rectangle(Pad - 4, cy - 3, Width - 2 * Pad + 8, 6);
-                using (GraphicsPath gp = Skin.Round(groove, 3))
-                using (LinearGradientBrush b = new LinearGradientBrush(groove, Color.FromArgb(40, 40, 44), Color.FromArgb(130, 130, 135), 90f))
-                { g.FillPath(b, gp); }
-                int tx = Pad + (int)Math.Round((Width - 2 * Pad) * f);
-                Rectangle th = new Rectangle(tx - 7, cy - 11, 14, 22);
-                DrawThumb(g, th, false);
+                int left = PadTop;
+                int right = Width - PadBottom;
+                int tx = left + (int)Math.Round((right - left) * f);
+                Rectangle gv = new Rectangle(left - 4, cy - 3, right - left + 8, 6);
+                using (GraphicsPath gp = Skin.Round(gv, 3))
+                {
+                    using (Brush b = new SolidBrush(Color.FromArgb(205, 205, 208))) { g.FillPath(b, gp); }
+                    using (Pen p = new Pen(Color.FromArgb(170, 170, 175))) { g.DrawPath(p, gp); }
+                }
+                DrawThumb(g, new Rectangle(tx - 9, cy - 8, 18, 16), false);
             }
+        }
+
+        private void DrawTicks(Graphics g, int top, int bot, int cx)
+        {
+            g.SmoothingMode = SmoothingMode.None;
+            Color gray = Color.FromArgb(155, 159, 155);
+            using (Pen tp = new Pen(gray))
+            using (Pen rp = new Pen(Color.FromArgb(237, 0, 0)))
+            {
+                for (int i = 0; i <= 24; i++)
+                {
+                    int y = top + (int)Math.Round((bot - top) * i / 24.0);
+                    int len = (i % 6 == 0) ? 11 : ((i % 3 == 0) ? 8 : 5);
+                    Pen p = (i == 0 || i == 24) ? rp : tp;
+                    if (i == 12) continue;
+                    g.DrawLine(p, 3, y, 3 + len, y);
+                    g.DrawLine(p, Width - 4 - len, y, Width - 4, y);
+                }
+                int zy = top + (bot - top) / 2;
+                using (Brush gb = new SolidBrush(gray)) { g.FillRectangle(gb, 3, zy - 1, 11, 3); }
+                using (Brush bb = new SolidBrush(Color.Black))
+                { g.FillPolygon(bb, new Point[] { new Point(Width - 3, zy - 4), new Point(Width - 3, zy + 4), new Point(Width - 10, zy) }); }
+            }
+            g.SmoothingMode = SmoothingMode.AntiAlias;
         }
 
         private static void DrawThumb(Graphics g, Rectangle th, bool vert)
         {
             using (GraphicsPath gp = Skin.Round(th, 3))
             {
-                using (LinearGradientBrush b = new LinearGradientBrush(th, Color.FromArgb(252, 252, 252), Color.FromArgb(190, 190, 195), vert ? 90f : 0f))
+                using (LinearGradientBrush b = new LinearGradientBrush(th, Color.FromArgb(255, 255, 255), Color.FromArgb(205, 205, 210), vert ? 90f : 90f))
                 { g.FillPath(b, gp); }
-                using (Pen p = new Pen(Color.FromArgb(70, 70, 76))) { g.DrawPath(p, gp); }
-            }
-            using (Pen bp = new Pen(Skin.Blue, 2f))
-            {
-                if (vert) g.DrawLine(bp, th.X + 3, th.Y + th.Height / 2, th.Right - 3, th.Y + th.Height / 2);
-                else g.DrawLine(bp, th.X + th.Width / 2, th.Y + 3, th.X + th.Width / 2, th.Bottom - 3);
+                using (Pen p = new Pen(Color.FromArgb(125, 125, 130))) { g.DrawPath(p, gp); }
             }
         }
     }
@@ -172,7 +221,8 @@ namespace EaxReverbEngine
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.Selectable, true);
             Size = new Size(86, 24);
             Cursor = BlueCursor.Arrow;
-            Font = new Font("Tahoma", 8f);
+            Font = new Font("Tahoma", 9f);
+            ForeColor = Color.Black;
         }
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { _hover = false; _down = false; Invalidate(); base.OnMouseLeave(e); }
@@ -183,20 +233,20 @@ namespace EaxReverbEngine
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             Rectangle r = new Rectangle(0, 0, Width - 1, Height - 1);
-            Color c1 = Checked ? Color.FromArgb(185, 205, 240) : Color.FromArgb(255, 255, 255);
-            Color c2 = Checked ? Color.FromArgb(130, 165, 225) : (_hover ? Color.FromArgb(225, 225, 230) : Color.FromArgb(205, 205, 210));
+            Color c1 = Checked ? Color.FromArgb(205, 225, 252) : Color.FromArgb(255, 255, 255);
+            Color c2 = Checked ? Color.FromArgb(150, 185, 235) : (_hover ? Color.FromArgb(232, 236, 244) : Color.FromArgb(222, 222, 226));
             if (_down) { Color t = c1; c1 = c2; c2 = t; }
             using (GraphicsPath gp = Skin.Round(r, 6))
             {
                 using (LinearGradientBrush b = new LinearGradientBrush(r, c1, c2, 90f)) { g.FillPath(b, gp); }
-                using (Pen p = new Pen(Color.FromArgb(70, 70, 76))) { g.DrawPath(p, gp); }
+                using (Pen p = new Pen(Color.FromArgb(70, 70, 76), 1.4f)) { g.DrawPath(p, gp); }
             }
-            TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), Color.Black,
+            TextRenderer.DrawText(g, Text, Font, new Rectangle(0, 0, Width, Height), ForeColor,
                 TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
         }
     }
 
-    // ايقونات الشريط السفلي (Bass / Stereo / Surround / Eq / Speaker / Mixer)
+    // ايقونات الشريط السفلي (صور الاصلية + رسم لـ Stereo)
     internal sealed class BarIcon : Control
     {
         private readonly string _kind;
@@ -207,12 +257,25 @@ namespace EaxReverbEngine
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint |
                      ControlStyles.OptimizedDoubleBuffer | ControlStyles.SupportsTransparentBackColor, true);
             BackColor = Color.Transparent;
-            Size = new Size(30, 26);
+            Size = new Size(27, 27);
             Cursor = BlueCursor.Arrow;
         }
         public bool On { get { return _on; } set { if (_on != value) { _on = value; Invalidate(); } } }
         protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
         protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); base.OnMouseLeave(e); }
+
+        private string AssetName()
+        {
+            switch (_kind)
+            {
+                case "eq": return "ic_grid";
+                case "speaker": return "ic_woof";
+                case "mixer": return "ic_caps";
+                case "bass": return "ic_plus";
+                case "surround": return "ic_swirl";
+                default: return null;
+            }
+        }
 
         private static void Cone(Graphics g, Brush b, float x, float cy, float s)
         {
@@ -226,66 +289,38 @@ namespace EaxReverbEngine
         {
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            Rectangle r = new Rectangle(1, 1, Width - 3, Height - 3);
-            if (_on || _hover)
+            Bitmap img = null;
+            string an = AssetName();
+            if (an != null) img = Assets.Get(an);
+            if (img != null)
             {
-                using (GraphicsPath gp = Skin.Round(r, 5))
+                g.SmoothingMode = SmoothingMode.None;
+                g.DrawImage(img, 1, 1, img.Width, img.Height);
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+            }
+            else
+            {
+                Rectangle r = new Rectangle(1, 1, 24, 24);
+                using (GraphicsPath gp = Skin.Round(r, 3))
                 {
-                    using (Brush b = new SolidBrush(_on ? Color.FromArgb(170, 200, 245) : Color.FromArgb(120, 255, 255, 255))) { g.FillPath(b, gp); }
-                    using (Pen p = new Pen(_on ? Color.FromArgb(50, 100, 190) : Color.FromArgb(120, 120, 125))) { g.DrawPath(p, gp); }
+                    using (LinearGradientBrush b = new LinearGradientBrush(r, Color.FromArgb(250, 250, 250), Color.FromArgb(200, 200, 204), 90f)) { g.FillPath(b, gp); }
+                    using (Pen p = new Pen(Color.FromArgb(90, 90, 94))) { g.DrawPath(p, gp); }
+                }
+                Color c = Color.FromArgb(40, 42, 50);
+                using (Brush b = new SolidBrush(c))
+                {
+                    Cone(g, b, 3, 13, 0.9f);
+                    Cone(g, b, 14, 13, 0.9f);
                 }
             }
-            Color c = Color.FromArgb(40, 42, 50);
-            using (Brush b = new SolidBrush(c))
-            using (Pen pen = new Pen(c, 1.5f))
+            if (_on)
             {
-                float cy = Height / 2f;
-                if (_kind == "bass")
-                {
-                    Cone(g, b, 5, cy, 1.2f);
-                    g.DrawArc(pen, 12, cy - 4, 6, 8, -60, 120);
-                    g.DrawArc(pen, 14, cy - 7, 9, 14, -60, 120);
-                    g.DrawArc(pen, 16, cy - 10, 12, 20, -60, 120);
-                }
-                else if (_kind == "stereo")
-                {
-                    Cone(g, b, 2, cy, 0.9f);
-                    Cone(g, b, 16, cy, 0.9f);
-                }
-                else if (_kind == "surround")
-                {
-                    Cone(g, b, 10, cy, 1.0f);
-                    g.DrawArc(pen, 19, cy - 5, 6, 10, -60, 120);
-                    g.DrawArc(pen, 21, cy - 8, 9, 16, -60, 120);
-                    g.DrawArc(pen, 2, cy - 5, 6, 10, 120, 120);
-                    g.DrawArc(pen, 0, cy - 8, 9, 16, 120, 120);
-                }
-                else if (_kind == "eq")
-                {
-                    g.FillRectangle(b, 6, 8, 3, 11); g.FillRectangle(b, 13, 5, 3, 14); g.FillRectangle(b, 20, 10, 3, 9);
-                    using (Brush w = new SolidBrush(Color.FromArgb(240, 240, 240)))
-                    {
-                        g.FillRectangle(w, 5, 10, 5, 3); g.FillRectangle(w, 12, 8, 5, 3); g.FillRectangle(w, 19, 13, 5, 3);
-                    }
-                }
-                else if (_kind == "speaker")
-                {
-                    g.FillEllipse(b, 5, 3, 20, 20);
-                    using (Brush w = new SolidBrush(Color.FromArgb(235, 235, 235)))
-                    {
-                        g.FillEllipse(w, 9, 7, 12, 12);
-                    }
-                    g.FillEllipse(b, 12, 10, 6, 6);
-                }
-                else
-                {
-                    for (int i = 0; i < 4; i++)
-                    {
-                        int x = 6 + i * 6;
-                        g.DrawLine(pen, x, 5, x, 21);
-                        g.FillRectangle(b, x - 2, 8 + (i * 5) % 9, 5, 4);
-                    }
-                }
+                using (Brush b = new SolidBrush(Color.FromArgb(70, 40, 120, 255))) { g.FillRectangle(b, 1, 1, 25, 25); }
+                using (Pen p = new Pen(Color.FromArgb(0, 95, 210), 2f)) { g.DrawRectangle(p, 1, 1, 24, 24); }
+            }
+            else if (_hover)
+            {
+                using (Pen p = new Pen(Color.FromArgb(0, 95, 210), 1f)) { g.DrawRectangle(p, 1, 1, 24, 24); }
             }
         }
     }
@@ -305,24 +340,22 @@ namespace EaxReverbEngine
             Graphics g = e.Graphics;
             g.SmoothingMode = SmoothingMode.AntiAlias;
             Rectangle r = new Rectangle(0, 0, Width, Height);
-            using (LinearGradientBrush b = new LinearGradientBrush(r, Color.FromArgb(120, 112, 100), Color.FromArgb(250, 205, 150), 90f))
+            using (LinearGradientBrush b = new LinearGradientBrush(r, Color.FromArgb(156, 150, 132), Color.FromArgb(255, 245, 190), 90f))
             { g.FillRectangle(b, r); }
-            using (Brush b = new SolidBrush(Color.FromArgb(70, 255, 235, 200)))
-            { g.FillPolygon(b, new PointF[] { new PointF(0, 0), new PointF(30, 22), new PointF(30, Height - 30), new PointF(0, Height) }); }
-            using (Brush b = new SolidBrush(Color.FromArgb(60, 255, 235, 200)))
-            { g.FillPolygon(b, new PointF[] { new PointF(Width, 0), new PointF(Width - 30, 22), new PointF(Width - 30, Height - 30), new PointF(Width, Height) }); }
-            using (Pen p = new Pen(Color.FromArgb(90, 40, 30, 20), 1f))
-            { g.DrawRectangle(p, 30, 22, Width - 60, Height - 52); }
+            using (Brush b = new SolidBrush(Color.FromArgb(90, 60, 50, 40)))
+            { g.FillPolygon(b, new PointF[] { new PointF(0, 0), new PointF(34, 24), new PointF(34, Height - 24), new PointF(0, Height) }); }
+            using (Brush b = new SolidBrush(Color.FromArgb(90, 60, 50, 40)))
+            { g.FillPolygon(b, new PointF[] { new PointF(Width, 0), new PointF(Width - 34, 24), new PointF(Width - 34, Height - 24), new PointF(Width, Height) }); }
+            using (Brush b = new SolidBrush(Color.FromArgb(70, 120, 110, 100)))
+            { g.FillRectangle(b, Width / 2 - 40, 6, 80, 12); }
             if (_head)
             {
                 using (Pen band = new Pen(Color.FromArgb(25, 25, 28), 5f))
-                {
-                    g.DrawArc(band, Width / 2 - 38, 30, 76, 80, 180, 180);
-                }
+                { g.DrawArc(band, Width / 2 - 38, 36, 76, 80, 180, 180); }
                 using (Brush cup = new SolidBrush(Color.FromArgb(30, 30, 34)))
                 {
-                    g.FillEllipse(cup, Width / 2 - 48, 70, 22, 34);
-                    g.FillEllipse(cup, Width / 2 + 26, 70, 22, 34);
+                    g.FillEllipse(cup, Width / 2 - 48, 76, 22, 34);
+                    g.FillEllipse(cup, Width / 2 + 26, 76, 22, 34);
                 }
             }
             else
@@ -370,6 +403,12 @@ namespace EaxReverbEngine
         {
             try
             {
+                byte[] raw = Convert.FromBase64String(CursorData.HandBlue);
+                return new Cursor(new System.IO.MemoryStream(raw));
+            }
+            catch (Exception) { }
+            try
+            {
                 using (Bitmap bmp = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
                 {
                     using (Graphics g = Graphics.FromImage(bmp))
@@ -408,7 +447,6 @@ namespace EaxReverbEngine
                 Cursor c = Arrow;
                 root.Cursor = c;
                 foreach (Control ch in root.Controls) Apply(ch);
-                root.ControlAdded += delegate(object s, ControlEventArgs e) { Apply(e.Control); };
             }
             catch (Exception) { }
         }

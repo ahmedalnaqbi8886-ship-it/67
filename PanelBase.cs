@@ -6,14 +6,14 @@ using System.Windows.Forms;
 
 namespace EaxReverbEngine
 {
-    // اساس النوافذ: ترويسة (ايقونة + عنوان + جهاز + ؟) + جسم + شريط سفلي
+    // اساس النوافذ: ترويسة بيضاء + جسم + شريط سفلي معدني (مثل الاصلي)
     internal abstract class PanelBase : Form
     {
         [DllImport("user32.dll")] private static extern bool ReleaseCapture();
         [DllImport("user32.dll")] private static extern IntPtr SendMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
 
-        protected const int HeadH = 42;
-        protected const int BarH = 38;
+        protected const int HeadH = 40;
+        protected const int BarH = 30;
 
         protected readonly FxChain Fx;
         protected readonly Panel Body;
@@ -21,7 +21,6 @@ namespace EaxReverbEngine
         private readonly string _kind;
         private readonly string _title;
         private Panel _head, _bar;
-        private BarIcon[] _nav;
 
         protected PanelBase(FxChain fx, string kind, string title, int w, int h)
         {
@@ -29,10 +28,9 @@ namespace EaxReverbEngine
             _kind = kind;
             _title = title;
             Text = title;
-            Font = new Font("Tahoma", 8f);
+            Font = new Font("Tahoma", 8.25f);
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            ShowInTaskbar = true;
             BackColor = Skin.Back;
             ClientSize = new Size(w, HeadH + h + BarH);
 
@@ -58,36 +56,17 @@ namespace EaxReverbEngine
             _head.Paint += delegate(object s, PaintEventArgs e)
             {
                 Graphics g = e.Graphics;
-                g.SmoothingMode = SmoothingMode.AntiAlias;
-                Rectangle rr = new Rectangle(0, 0, _head.Width, _head.Height);
-                using (LinearGradientBrush b = new LinearGradientBrush(rr, Color.FromArgb(255, 255, 255), Color.FromArgb(222, 222, 226), 90f))
-                { g.FillRectangle(b, rr); }
-                using (Pen p = new Pen(Color.FromArgb(150, 150, 155))) { g.DrawLine(p, 0, HeadH - 1, _head.Width, HeadH - 1); }
-                Rectangle ic = new Rectangle(8, 6, 30, 30);
-                using (GraphicsPath gp = Skin.Round(ic, 6))
+                g.Clear(Color.White);
+                int[] sh = new int[] { 133, 182, 201, 214 };
+                for (int i = 0; i < 4; i++)
                 {
-                    using (LinearGradientBrush b = new LinearGradientBrush(ic, Color.FromArgb(90, 95, 110), Color.FromArgb(25, 25, 32), 90f)) { g.FillPath(b, gp); }
-                    using (Pen p = new Pen(Color.FromArgb(40, 40, 46))) { g.DrawPath(p, gp); }
+                    using (Pen p = new Pen(Color.FromArgb(sh[i], sh[i], sh[i]))) { g.DrawLine(p, 0, 36 + i, _head.Width, 36 + i); }
                 }
-                using (Pen ip = new Pen(Color.White, 2f))
-                using (Brush ib = new SolidBrush(Color.FromArgb(120, 190, 255)))
-                {
-                    if (_kind == "speaker")
-                    {
-                        g.DrawEllipse(ip, 13, 11, 20, 20);
-                        g.FillEllipse(ib, 19, 17, 8, 8);
-                    }
-                    else if (_kind == "mixer")
-                    {
-                        for (int i = 0; i < 3; i++) { g.DrawLine(ip, 15 + i * 7, 11, 15 + i * 7, 31); g.FillRectangle(ib, 12 + i * 7, 14 + i * 5, 6, 4); }
-                    }
-                    else
-                    {
-                        for (int i = 0; i < 4; i++) { g.DrawLine(ip, 13 + i * 6, 11, 13 + i * 6, 31); g.FillRectangle(ib, 11 + i * 6, 25 - (i * 7) % 14, 5, 4); }
-                    }
-                }
-                using (Font f = new Font("Tahoma", 10.5f, FontStyle.Bold))
-                { TextRenderer.DrawText(g, _title, f, new Point(46, 11), Color.FromArgb(25, 25, 30)); }
+                string an = _kind == "speaker" ? "hdr_spk" : (_kind == "mixer" ? "hdr_mix" : "hdr_eq");
+                Bitmap ic = Assets.Get(an);
+                if (ic != null) g.DrawImage(ic, 13, 4, ic.Width, ic.Height);
+                using (Font f = new Font("Tahoma", 10f, FontStyle.Bold))
+                { TextRenderer.DrawText(g, _title, f, new Point(46, 9), Color.Black); }
             };
             _head.MouseDown += delegate(object s, MouseEventArgs e)
             {
@@ -99,27 +78,41 @@ namespace EaxReverbEngine
             dev.DropDownStyle = ComboBoxStyle.DropDownList;
             dev.Items.Add("Virtual Audio Output");
             dev.SelectedIndex = 0;
-            dev.SetBounds(w - 300, 10, 170, 21);
+            dev.SetBounds(w - 295, 7, 170, 21);
             _head.Controls.Add(dev);
 
             SkinButton help = new SkinButton();
             help.Text = "?";
-            help.Font = new Font("Tahoma", 9f, FontStyle.Bold);
-            help.SetBounds(w - 122, 9, 38, 24);
+            help.Font = new Font("Tahoma", 10f, FontStyle.Bold);
+            help.ForeColor = Skin.Blue;
+            help.SetBounds(w - 122, 7, 38, 22);
             help.Click += delegate { MessageBox.Show(this, "Audio effects panel.\r\nEqualizer, Surround Mixer and Speaker Settings.", _title); };
             _head.Controls.Add(help);
 
+            SkinButton arrow = new SkinButton();
+            arrow.Text = "";
+            arrow.SetBounds(w - 84, 7, 20, 22);
+            arrow.Paint += delegate(object s, PaintEventArgs e)
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using (Brush b = new SolidBrush(Skin.Blue))
+                { e.Graphics.FillPolygon(b, new Point[] { new Point(5, 9), new Point(14, 9), new Point(9, 15) }); }
+            };
+            _head.Controls.Add(arrow);
+
             Label min = new Label();
-            min.Text = "—"; min.Font = new Font("Tahoma", 9f, FontStyle.Bold);
+            min.Text = "_"; min.Font = new Font("Tahoma", 10f, FontStyle.Bold);
+            min.ForeColor = Color.FromArgb(110, 110, 110);
             min.BackColor = Color.Transparent; min.Cursor = BlueCursor.Arrow;
-            min.SetBounds(w - 66, 10, 24, 22); min.TextAlign = ContentAlignment.MiddleCenter;
+            min.SetBounds(w - 50, 8, 24, 22); min.TextAlign = ContentAlignment.MiddleCenter;
             min.Click += delegate { WindowState = FormWindowState.Minimized; };
             _head.Controls.Add(min);
 
             Label close = new Label();
-            close.Text = "X"; close.Font = new Font("Tahoma", 9f, FontStyle.Bold);
+            close.Text = "X"; close.Font = new Font("Tahoma", 9f);
+            close.ForeColor = Color.FromArgb(110, 110, 110);
             close.BackColor = Color.Transparent; close.Cursor = BlueCursor.Arrow;
-            close.SetBounds(w - 38, 10, 24, 22); close.TextAlign = ContentAlignment.MiddleCenter;
+            close.SetBounds(w - 28, 8, 22, 22); close.TextAlign = ContentAlignment.MiddleCenter;
             close.Click += delegate { Close(); };
             _head.Controls.Add(close);
         }
@@ -130,47 +123,50 @@ namespace EaxReverbEngine
             _bar.SetBounds(0, y, w, BarH);
             _bar.Paint += delegate(object s, PaintEventArgs e)
             {
-                Rectangle rr = new Rectangle(0, 0, _bar.Width, _bar.Height);
-                using (LinearGradientBrush b = new LinearGradientBrush(rr, Color.FromArgb(246, 246, 248), Color.FromArgb(176, 176, 182), 90f))
-                { e.Graphics.FillRectangle(b, rr); }
-                using (Pen p = new Pen(Color.FromArgb(120, 120, 126))) { e.Graphics.DrawLine(p, 0, 0, _bar.Width, 0); }
+                Bitmap t = Assets.Get("bar_tile");
+                if (t == null)
+                {
+                    Rectangle rr = new Rectangle(0, 0, _bar.Width, _bar.Height);
+                    using (LinearGradientBrush b = new LinearGradientBrush(rr, Color.FromArgb(246, 246, 248), Color.FromArgb(176, 176, 182), 90f))
+                    { e.Graphics.FillRectangle(b, rr); }
+                    return;
+                }
+                for (int x = 0; x < _bar.Width; x += t.Width)
+                    e.Graphics.DrawImage(t, x, 0, t.Width, BarH);
             };
             Controls.Add(_bar);
 
             SkinButton def = new SkinButton();
             def.Text = "Default";
-            def.SetBounds(14, 7, 96, 24);
+            def.SetBounds(20, 3, 88, 24);
             def.Click += delegate { DoDefault(); Reload(); };
             _bar.Controls.Add(def);
 
             string[] kinds = new string[] { "eq", "speaker", "mixer" };
             string[] tips = new string[] { "Equalizer", "Speaker Settings", "Surround Mixer" };
             ToolTip tt = new ToolTip();
-            _nav = new BarIcon[3];
             for (int i = 0; i < kinds.Length; i++)
             {
                 string k = kinds[i];
                 BarIcon nb = new BarIcon(k);
                 nb.On = (k == _kind);
-                nb.Location = new Point(124 + i * 34, 6);
+                nb.Location = new Point(118 + i * 32, 1);
                 nb.Click += delegate { EqPanel.OpenFrom(k, this); };
                 tt.SetToolTip(nb, tips[i]);
                 _bar.Controls.Add(nb);
-                _nav[i] = nb;
             }
         }
 
-        // ايقونة تبديل اضافية في الشريط السفلي
         protected BarIcon AddToggle(string kind, string tip, int x)
         {
             BarIcon b = new BarIcon(kind);
-            b.Location = new Point(x, 6);
+            b.Location = new Point(x, 1);
             new ToolTip().SetToolTip(b, tip);
             _bar.Controls.Add(b);
             return b;
         }
 
-        // لوح رمادي مدور مثل Creative
+        // لوح رمادي مدور مثل الاصلي
         protected Panel Group(Control parent, string title, int x, int y, int w, int h)
         {
             Panel p = new Panel();
@@ -179,10 +175,10 @@ namespace EaxReverbEngine
             {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 Rectangle r = new Rectangle(0, 0, p.Width - 1, p.Height - 1);
-                using (GraphicsPath gp = Skin.Round(r, 6))
+                using (GraphicsPath gp = Skin.Round(r, 7))
                 {
                     using (Brush b = new SolidBrush(Skin.Panel)) { e.Graphics.FillPath(b, gp); }
-                    using (Pen pe = new Pen(Skin.PanelEdge)) { e.Graphics.DrawPath(pe, gp); }
+                    using (Pen pe = new Pen(Color.FromArgb(231, 227, 231))) { e.Graphics.DrawPath(pe, gp); }
                 }
             };
             p.BackColor = Skin.Back;
@@ -213,8 +209,10 @@ namespace EaxReverbEngine
         protected CSlider VBar(Control parent, int x, int y, int h)
         {
             CSlider t = new CSlider();
+            t.Kind = SliderKind.Mixer;
             t.Orientation = Orientation.Vertical;
             t.Minimum = 0; t.Maximum = 100;
+            t.PadTop = 10; t.PadBottom = 10;
             t.SetBounds(x, y, 30, h);
             parent.Controls.Add(t);
             return t;
@@ -223,13 +221,15 @@ namespace EaxReverbEngine
         protected CSlider HBar(Control parent, int x, int y, int w, int min, int max)
         {
             CSlider t = new CSlider();
+            t.Kind = SliderKind.Horiz;
             t.Minimum = min; t.Maximum = max;
+            t.PadTop = 10; t.PadBottom = 10;
             t.SetBounds(x, y, w, 26);
             parent.Controls.Add(t);
             return t;
         }
 
-        // علامة تبويب مرسومة (صف علوي)
+        // صف تبويبات مثل الاصلي (المحدد رمادي بحواف مدورة فوق)
         protected sealed class Tabs : Control
         {
             private readonly string[] _names;
@@ -239,7 +239,7 @@ namespace EaxReverbEngine
             {
                 _names = names;
                 SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
-                Height = 32;
+                Height = 29;
                 Cursor = BlueCursor.Arrow;
             }
             public int Selected { get { return _sel; } set { if (value != _sel) { _sel = value; Invalidate(); if (Changed != null) Changed(this, EventArgs.Empty); } } }
@@ -255,18 +255,21 @@ namespace EaxReverbEngine
             {
                 Graphics g = e.Graphics;
                 g.SmoothingMode = SmoothingMode.AntiAlias;
-                g.Clear(Skin.Back);
+                g.Clear(Color.White);
                 int w = Width / _names.Length;
                 for (int i = 0; i < _names.Length; i++)
                 {
-                    Rectangle r = new Rectangle(i * w + 2, 2, w - 4, Height + 8);
-                    bool sel = i == _sel;
-                    using (GraphicsPath gp = Skin.Round(r, 8))
+                    if (i == _sel)
                     {
-                        using (Brush b = new SolidBrush(sel ? Skin.Panel : Color.FromArgb(250, 250, 250))) { g.FillPath(b, gp); }
-                        using (Pen p = new Pen(sel ? Color.FromArgb(120, 120, 126) : Color.FromArgb(190, 190, 195))) { g.DrawPath(p, gp); }
+                        Rectangle r = new Rectangle(i * w + 1, 0, w - 2, Height + 10);
+                        using (GraphicsPath gp = Skin.Round(r, 7))
+                        {
+                            using (LinearGradientBrush b = new LinearGradientBrush(new Rectangle(r.X, r.Y, r.Width, Height), Color.FromArgb(246, 246, 246), Color.FromArgb(222, 219, 222), 90f))
+                            { g.FillPath(b, gp); }
+                            using (Pen p = new Pen(Color.FromArgb(150, 150, 154))) { g.DrawPath(p, gp); }
+                        }
                     }
-                    TextRenderer.DrawText(g, _names[i], Font, new Rectangle(i * w, 0, w, Height - 4), Color.Black,
+                    TextRenderer.DrawText(g, _names[i], Font, new Rectangle(i * w, 0, w, Height - 2), Color.Black,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 }
             }
@@ -275,7 +278,7 @@ namespace EaxReverbEngine
         protected override void OnPaint(PaintEventArgs e)
         {
             base.OnPaint(e);
-            using (Pen p = new Pen(Color.FromArgb(90, 90, 96))) { e.Graphics.DrawRectangle(p, 0, 0, Width - 1, Height - 1); }
+            using (Pen p = new Pen(Color.FromArgb(120, 120, 126))) { e.Graphics.DrawRectangle(p, 0, 0, Width - 1, Height - 1); }
         }
 
         protected override void OnVisibleChanged(EventArgs e)

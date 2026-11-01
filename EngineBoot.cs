@@ -28,9 +28,15 @@ namespace EaxReverbEngine
 				{
 					(IntPtr.Size == 8) ? "64" : "32"
 				});
+				if (!LicenseGate.Ensure())
+				{
+					Log.Write("license: not activated - engine not started");
+					return;
+				}
 				EngineBoot._cfg = EngineConfig.Load(text);
 				EngineBoot._engine = new Engine(text);
 				EngineBoot._engine.StartAudio(EngineBoot._cfg);
+				LicenseGate.Watch(delegate() { try { EngineBoot._engine.Stop(); } catch (Exception) { } });
 				Log.Write(EngineBoot._engine.AudioStarted ? "engine audio running" : "engine idle (no audio started)");
 				if (form != null)
 				{
