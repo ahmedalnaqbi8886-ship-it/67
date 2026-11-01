@@ -54,6 +54,7 @@ namespace EaxReverbEngine
             SetStyle(ControlStyles.SupportsTransparentBackColor, true);
             BackColor = Color.Transparent;
             Size = new Size(120, 26);
+            Cursor = BlueCursor.Arrow;
         }
 
         public Orientation Orientation
@@ -173,29 +174,22 @@ namespace EaxReverbEngine
             }
             else
             {
+                // سلايدر افقي مسطح - نفس شكل Bass Boost / Bass Management الاصلي بالضبط
+                // (خط تجويف رفيع غائر + مقبض مستطيل مسطح بارز، بدون تدرج لامع او صور بديلة)
                 int cy = Height / 2;
                 int left = PadTop;
                 int right = Width - PadBottom;
                 int tx = left + (int)Math.Round((right - left) * f);
-                Bitmap gh = Assets.Get("groove_h");
+
                 g.SmoothingMode = SmoothingMode.None;
-                if (gh != null)
-                {
-                    for (int gx = left; gx < right; gx += gh.Width) g.DrawImage(gh, gx, cy - gh.Height / 2, Math.Min(gh.Width, right - gx), gh.Height);
-                }
-                else
-                {
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    Rectangle gv = new Rectangle(left - 4, cy - 3, right - left + 8, 6);
-                    using (GraphicsPath gp = Skin.Round(gv, 3))
-                    {
-                        using (Brush b = new SolidBrush(Color.FromArgb(205, 205, 208))) { g.FillPath(b, gp); }
-                        using (Pen p = new Pen(Color.FromArgb(170, 170, 175))) { g.DrawPath(p, gp); }
-                    }
-                }
-                Bitmap ht = Assets.Get("thumb_h");
-                if (ht != null) g.DrawImage(ht, tx - ht.Width / 2, cy - ht.Height / 2, ht.Width, ht.Height);
-                else { g.SmoothingMode = SmoothingMode.AntiAlias; DrawThumb(g, new Rectangle(tx - 9, cy - 8, 18, 16), false); }
+                int gy = cy - 2;
+                using (Pen top1 = new Pen(Color.FromArgb(142, 142, 142))) { g.DrawLine(top1, left, gy, right, gy); }
+                using (Pen top2 = new Pen(Color.FromArgb(176, 176, 176))) { g.DrawLine(top2, left, gy + 1, right, gy + 1); }
+                using (Brush fillB = new SolidBrush(Color.FromArgb(208, 208, 208))) { g.FillRectangle(fillB, left, gy + 2, right - left, 1); }
+                using (Pen bot = new Pen(Color.FromArgb(253, 253, 253))) { g.DrawLine(bot, left, gy + 3, right, gy + 3); }
+
+                Rectangle th = new Rectangle(tx - 6, cy - 9, 12, 18);
+                DrawFlatThumb(g, th);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
             }
         }
@@ -244,6 +238,23 @@ namespace EaxReverbEngine
             Rectangle hi = new Rectangle(th.X + 2, th.Y + 1, th.Width - 4, Math.Max(2, th.Height / 3));
             using (GraphicsPath hgp = Skin.Round(hi, 2))
             using (Brush hb = new SolidBrush(Color.FromArgb(150, 255, 255, 255))) { g.FillPath(hb, hgp); }
+        }
+
+        // مقبض مسطح بسيط بدون لمعان ولا ظل - مطابق تماما لمقابض Bass Boost / Bass Management الاصلية
+        private static void DrawFlatThumb(Graphics g, Rectangle th)
+        {
+            using (Brush fill = new SolidBrush(Color.FromArgb(226, 226, 226))) { g.FillRectangle(fill, th); }
+            using (Pen hi = new Pen(Color.FromArgb(253, 253, 253)))
+            {
+                g.DrawLine(hi, th.X, th.Y, th.Right - 2, th.Y);
+                g.DrawLine(hi, th.X, th.Y, th.X, th.Bottom - 2);
+            }
+            using (Pen sh = new Pen(Color.FromArgb(145, 145, 145)))
+            {
+                g.DrawLine(sh, th.X + 1, th.Bottom - 1, th.Right - 1, th.Bottom - 1);
+                g.DrawLine(sh, th.Right - 1, th.Y + 1, th.Right - 1, th.Bottom - 1);
+            }
+            using (Pen edge = new Pen(Color.FromArgb(120, 120, 120))) { g.DrawRectangle(edge, th.X, th.Y, th.Width - 2, th.Height - 2); }
         }
 
         private static Blend _gloss;
@@ -539,6 +550,7 @@ namespace EaxReverbEngine
         {
             SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer, true);
             Size = new Size(220, 140);
+            Cursor = BlueCursor.Arrow;
         }
         public bool Headphone { get { return _head; } set { if (_head != value) { _head = value; Invalidate(); } } }
         protected override void OnPaint(PaintEventArgs e)
@@ -640,12 +652,21 @@ namespace EaxReverbEngine
 
         private static Cursor Make()
         {
+            byte[] raw = null;
+            try { raw = Convert.FromBase64String(CursorData.HandBlue); } catch (Exception) { }
+            if (raw == null) return Cursors.Hand;
+
+            // محاولة اولى: تحميل من الذاكرة مباشرة - لا تحتاج كتابة ملف ولا صلاحيات،
+            // تشتغل حتى لو البرنامج مستضاف داخل عملية ثانية (DAW/Host) بصلاحيات محدودة
+            try { return new Cursor(new MemoryStream(raw)); }
+            catch (Exception) { }
+
+            // محاولة ثانية (احتياط): كتابة ملف .cur حقيقي وتحميله عن طريق وندوز نفسه
             try
             {
                 string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CreativeEAXSettings");
                 Directory.CreateDirectory(dir);
                 _curPath = Path.Combine(dir, "pointer.cur");
-                byte[] raw = Convert.FromBase64String(CursorData.HandBlue);
                 bool write = true;
                 if (File.Exists(_curPath))
                 {
@@ -654,13 +675,6 @@ namespace EaxReverbEngine
                 if (write) File.WriteAllBytes(_curPath, raw);
                 IntPtr h = LoadCursorFromFile(_curPath);
                 if (h != IntPtr.Zero) return new Cursor(h);
-            }
-            catch (Exception) { }
-            try
-            {
-                // محاولة ثانية: تحميل مباشر من الذاكرة (يعمل على اغلب انظمة ويندوز)
-                byte[] raw = Convert.FromBase64String(CursorData.HandBlue);
-                return new Cursor(new MemoryStream(raw));
             }
             catch (Exception) { }
             return Cursors.Hand;   // لا نستخدم اي رسم يدوي بديل، تفاديا لمؤشر اسود
