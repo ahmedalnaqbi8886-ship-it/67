@@ -25,7 +25,7 @@ namespace EaxReverbEngine
         private CSlider _lvl;
         private CheckBox _chk;
         private ComboBox _pre;
-        private BarIcon _bBass, _bStereo, _bSurround;
+        private SpeakerButton _bBass, _bStereo, _bSurround;
         private float _lastBass = 60f;
 
         public EqWindow(FxChain fx) : base(fx, "eq", "Graphic Equalizer", 500, 311)
